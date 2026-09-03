@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Civic Transparency and Accountability Platform">
+  <title>Civic Transparency</title>
+  <style>
+    :root { --navy: #0b2942; --blue: #166aa8; --sky: #eaf5fb; --ink: #152536; --muted: #5b6b79; --line: #d8e3eb; }
+    * { box-sizing: border-box; }
+    body { margin: 0; color: var(--ink); font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; background: #fff; }
+    .bar { padding: 20px clamp(24px, 7vw, 100px); color: #fff; background: var(--navy); display: flex; justify-content: space-between; align-items: center; }
+    .brand { font-weight: 750; letter-spacing: .05em; text-transform: uppercase; }
+    .phase { font-size: .8rem; color: #c7e5f7; }
+    main { max-width: 1120px; margin: 0 auto; padding: clamp(56px, 10vw, 112px) clamp(24px, 7vw, 100px); }
+    .eyebrow { color: var(--blue); font-size: .82rem; font-weight: 750; letter-spacing: .1em; text-transform: uppercase; }
+    h1 { max-width: 760px; margin: 14px 0 18px; color: var(--navy); font-size: clamp(2.5rem, 6vw, 4.9rem); line-height: 1.03; letter-spacing: -.045em; }
+    .intro { max-width: 640px; color: var(--muted); font-size: clamp(1.06rem, 2vw, 1.25rem); line-height: 1.65; }
+    .actions { display: flex; flex-wrap: wrap; gap: 12px; margin: 32px 0 68px; }
+    a { border-radius: 7px; padding: 13px 18px; font-weight: 700; text-decoration: none; }
+    .primary { color: #fff; background: var(--blue); }
+    .secondary { color: var(--navy); border: 1px solid var(--line); background: #fff; }
+    .categories { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; padding: 0; list-style: none; }
+    .categories li { padding: 17px; border: 1px solid var(--line); border-radius: 8px; background: var(--sky); font-weight: 650; }
+    footer { padding: 24px clamp(24px, 7vw, 100px); border-top: 1px solid var(--line); color: var(--muted); font-size: .9rem; }
+  </style>
+</head>
+<body>
+  <header class="bar">
+    <div class="brand">Civic Transparency</div>
+    <div class="phase">Citizen Accountability Platform</div>
+  </header>
+  <main>
+    <div class="eyebrow">A better way to be heard</div>
+    <h1>Make your city better.</h1>
+    <p class="intro">Report civic issues, follow the action taken, and see public progress — while keeping citizen identity and sensitive information protected.</p>
+    <div class="actions">
+      <a class="primary" href="#coming-soon">Report an issue</a>
+      <a class="secondary" href="#coming-soon">View public dashboard</a>
+    </div>
+    <ul class="categories" aria-label="Issue categories">
+      <li>Potholes</li><li>Roads</li><li>Encroachments</li><li>Schools</li><li>Sanitation</li><li>Public safety</li>
+    </ul>
+  </main>
+  <footer id="coming-soon">Issue reporting and the public dashboard will be introduced in the next product slices.</footer>
+</body>
+</html>

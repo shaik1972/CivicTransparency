@@ -46,3 +46,14 @@ desktop.ini
 
 # Local/tool-generated modernization tooling
 .github/modernize/
+
+# Store & Cache
+.pnpm-store/
+.gradle-user-home/
+application-local.properties
+**/application-local.properties
+node_modules/
+**/node_modules/
+.next/
+**/.next/
+
