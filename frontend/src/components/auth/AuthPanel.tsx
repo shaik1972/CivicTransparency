@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
 
 type Mode = "login" | "register";
@@ -81,16 +82,15 @@ export default function AuthPanel() {
 }
 
 function LoginForm() {
+  const router = useRouter();
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState<LoginResponse | null>(null);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
-    setSuccess(null);
 
     try {
       setSubmitting(true);
@@ -108,8 +108,11 @@ function LoginForm() {
       const data: LoginResponse = await response.json();
       sessionStorage.setItem("civic.accessToken", data.accessToken);
       sessionStorage.setItem("civic.tokenExpiresAt", data.expiresAt);
-      setSuccess(data);
-      setPassword("");
+      if (data.username) sessionStorage.setItem("civic.username", data.username);
+      if (data.publicAlias) sessionStorage.setItem("civic.publicAlias", data.publicAlias);
+      if (data.roles) sessionStorage.setItem("civic.roles", JSON.stringify(data.roles));
+      
+      router.push("/dashboard");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to sign in.");
     } finally {
@@ -131,13 +134,6 @@ function LoginForm() {
       {error && (
         <div role="alert" className="mt-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           {error}
-        </div>
-      )}
-
-      {success && (
-        <div role="status" className="mt-6 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
-          <p className="font-semibold">You are signed in.</p>
-          <p className="mt-1">Welcome back, {success.publicAlias || success.username || "citizen"}.</p>
         </div>
       )}
 

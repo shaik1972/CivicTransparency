@@ -1757,16 +1757,26 @@ New implementation areas include:
    - Issues HMAC-SHA256 JWT access tokens containing user ID, roles, issue timestamp, and expiration.
    - Updates `UserAccount.lastLoginAt`.
 
-2. **Automated Integration Tests**:
-   - `AuthenticationControllerIntegrationTest`: **PASS** (3/3 tests passed).
+2. **Backend Foundation & Security Configurations**:
+   - `build.gradle`: Added `jackson-databind` dependency for JWT JSON payload serialization in `HmacAccessTokenService`.
+   - `com.civictransparency.common.config.JacksonConfig`: Created `@Configuration` bean for `ObjectMapper`.
+   - `CitizenProfile`: Added 3-argument constructor (`UserAccount`, `publicAlias`, `profileStatus`) for entity and test setup.
+   - `HmacAccessTokenService`: Added fallback initialization for `ObjectMapper`.
+   - `application.properties` & `src/test/resources/application.properties`: Configured local database datasource properties, PostgreSQL driver, and HMAC token secret key (`civic.auth.token-secret`).
+
+3. **Automated Integration Tests**:
+   - `AuthenticationControllerIntegrationTest`: **PASS** (3/3 tests passed, covering email login, username login, and non-disclosing invalid credentials HTTP 401 error handling).
    - `CitizenRegistrationControllerIntegrationTest`: **PASS** (6/6 tests passed).
 
-3. **Frontend Integration**:
-   - Next.js UI (`frontend/src/components/auth/AuthPanel.tsx`) connected to login API and manages session tokens in `sessionStorage`.
+4. **Frontend Integration & Redirect**:
+   - Next.js UI (`frontend/src/components/auth/AuthPanel.tsx`) connected to login API (`POST /api/v1/auth/login`), stores tokens/metadata in `sessionStorage`, and redirects authenticated citizens to `/dashboard` via `router.push('/dashboard')`.
+   - Next.js Citizen Dashboard page (`frontend/src/app/dashboard/page.tsx`): Dedicated portal displaying welcome banner, user public alias, `@username`, `CITIZEN` role badge, real-time stat card counters, quick action cards (Report Issue, Browse Public Dashboard, Privacy & Profile), session protection (redirects unauthenticated visitors to `/`), and Sign Out action.
 
-4. **Single Source of Truth**:
-   - `docs/project-context/PROJECT_CONTEXT.md` updated as the single continuity source of truth.
+5. **Single Source of Truth**:
+   - `docs/project-context/PROJECT_CONTEXT.md` serves as the sole continuity source of truth.
 
 **End of Project Context**
+
+
 
 
