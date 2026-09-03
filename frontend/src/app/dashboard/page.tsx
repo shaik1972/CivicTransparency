@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 type UserSession = {
   publicAlias: string;
@@ -162,12 +163,12 @@ export default function DashboardPage() {
                   Submit potholes, road damage, garbage accumulation, or streetlight failures with photos.
                 </p>
               </div>
-              <button
-                disabled
-                className="mt-6 w-full rounded-lg bg-slate-100 py-2.5 text-xs font-semibold text-slate-500 cursor-not-allowed"
+              <Link
+                href="/report"
+                className="mt-6 w-full inline-block rounded-lg bg-sky-600 text-center py-2.5 text-xs font-semibold text-white shadow-sm hover:bg-sky-500"
               >
-                Report Issue (Coming Next)
-              </button>
+                Report Issue
+              </Link>
             </div>
 
             <div className="group flex flex-col justify-between rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:border-sky-500 hover:shadow-md">
