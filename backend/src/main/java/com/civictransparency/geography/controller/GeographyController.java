@@ -1,7 +1,9 @@
 package com.civictransparency.geography.controller;
 
 import com.civictransparency.geography.dto.CityResponse;
+import com.civictransparency.geography.dto.LocalityResponse;
 import com.civictransparency.geography.dto.StateResponse;
+import com.civictransparency.geography.dto.WardResponse;
 import com.civictransparency.geography.service.GeographyService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -34,5 +36,19 @@ public class GeographyController {
             @PathVariable UUID stateId) {
 
         return geographyService.getActiveCities(stateId);
+    }
+
+    @GetMapping("/cities/{cityId}/wards")
+    public List<WardResponse> getWards(
+            @PathVariable UUID cityId) {
+
+        return geographyService.getActiveWards(cityId);
+    }
+
+    @GetMapping("/wards/{wardId}/localities")
+    public List<LocalityResponse> getLocalities(
+            @PathVariable UUID wardId) {
+
+        return geographyService.getActiveLocalities(wardId);
     }
 }

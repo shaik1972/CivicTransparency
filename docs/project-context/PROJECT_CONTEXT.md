@@ -1777,6 +1777,29 @@ New implementation areas include:
 
 **End of Project Context**
 
+## V6 & V7 — Categories, Geography Data & Frontend Selection Checkpoint
 
+### Status: COMPLETED & VERIFIED
 
+1. **Database Migrations**:
+   - `V6__create_and_seed_complaint_categories.sql`: Created `complaint_category` and `complaint_subcategory` tables and seeded them with 6 main categories (ROADS, SANITATION, WATER, SAFETY, SCHOOL, FOOD) and 16 subcategories with default priorities.
+   - `V7__seed_bengaluru_wards_and_localities.sql`: Seeded Bengaluru city UUID with 6 Wards (Koramangala, Indiranagar, HSR Layout, Whitefield, Jayanagar, Malleshwaram) and 19 Localities.
 
+2. **Backend Geography & Category APIs**:
+   - `CategoryService`, `ComplaintCategoryRepository`, `ComplaintSubcategoryRepository`, and `CategoryController`.
+   - `GET /api/v1/categories`: Returns full category tree with subcategories and priorities.
+   - `GeographyService`, `WardRepository`, `LocalityRepository`, and `GeographyController`.
+   - `GET /api/v1/geography/cities/{cityId}/wards`: Returns wards for a city.
+   - `GET /api/v1/geography/wards/{wardId}/localities`: Returns localities for a ward.
+
+3. **Automated Integration Tests**:
+   - `CategoryControllerIntegrationTest`: **PASS** (Verifies 6 categories and subcategories priority).
+   - `GeographyHierarchyIntegrationTest`: **PASS** (Verifies cascade fetch of Bengaluru wards and Koramangala localities).
+
+4. **Frontend Implementation**:
+   - Developed `CategoryLocationSelector.tsx` for the reporting wizard.
+   - Implemented dynamic cascading dropdowns fetching from Geography API (Wards -> Localities).
+   - Included interactive category icon grid and priority-badged subcategories.
+
+5. **Single Source of Truth**:
+   - `docs/project-context/PROJECT_CONTEXT.md` updated as requested. All temporary plan docs and walkthroughs are archived in the repository context.

@@ -1,11 +1,17 @@
 package com.civictransparency.geography.service;
 
 import com.civictransparency.geography.dto.CityResponse;
+import com.civictransparency.geography.dto.LocalityResponse;
 import com.civictransparency.geography.dto.StateResponse;
+import com.civictransparency.geography.dto.WardResponse;
 import com.civictransparency.geography.entity.City;
+import com.civictransparency.geography.entity.Locality;
 import com.civictransparency.geography.entity.State;
+import com.civictransparency.geography.entity.Ward;
 import com.civictransparency.geography.repository.CityRepository;
+import com.civictransparency.geography.repository.LocalityRepository;
 import com.civictransparency.geography.repository.StateRepository;
+import com.civictransparency.geography.repository.WardRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,13 +24,19 @@ public class GeographyServiceImpl implements GeographyService {
 
     private final StateRepository stateRepository;
     private final CityRepository cityRepository;
+    private final WardRepository wardRepository;
+    private final LocalityRepository localityRepository;
 
     public GeographyServiceImpl(
             StateRepository stateRepository,
-            CityRepository cityRepository) {
+            CityRepository cityRepository,
+            WardRepository wardRepository,
+            LocalityRepository localityRepository) {
 
         this.stateRepository = stateRepository;
         this.cityRepository = cityRepository;
+        this.wardRepository = wardRepository;
+        this.localityRepository = localityRepository;
     }
 
     @Override
@@ -49,6 +61,28 @@ public class GeographyServiceImpl implements GeographyService {
                 .toList();
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public List<WardResponse> getActiveWards(UUID cityId) {
+
+        return wardRepository
+                .findByCityCityIdAndActiveTrueOrderByNameAsc(cityId)
+                .stream()
+                .map(this::toWardResponse)
+                .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<LocalityResponse> getActiveLocalities(UUID wardId) {
+
+        return localityRepository
+                .findByWardWardIdAndActiveTrueOrderByNameAsc(wardId)
+                .stream()
+                .map(this::toLocalityResponse)
+                .toList();
+    }
+
     private StateResponse toStateResponse(State state) {
 
         return new StateResponse(
@@ -64,5 +98,22 @@ public class GeographyServiceImpl implements GeographyService {
                 city.getState().getStateId(),
                 city.getCode(),
                 city.getName());
+    }
+
+    private WardResponse toWardResponse(Ward ward) {
+
+        return new WardResponse(
+                ward.getWardId(),
+                ward.getCity().getCityId(),
+                ward.getCode(),
+                ward.getName());
+    }
+
+    private LocalityResponse toLocalityResponse(Locality locality) {
+
+        return new LocalityResponse(
+                locality.getLocalityId(),
+                locality.getWard().getWardId(),
+                locality.getName());
     }
 }
