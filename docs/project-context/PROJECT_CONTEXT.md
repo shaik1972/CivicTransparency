@@ -1803,3 +1803,27 @@ New implementation areas include:
 
 5. **Single Source of Truth**:
    - `docs/project-context/PROJECT_CONTEXT.md` updated as requested. All temporary plan docs and walkthroughs are archived in the repository context.
+
+## V8 to V11 — Complaint Submission Flow & Frontend Reporting Checkpoint
+
+### Status: COMPLETED & VERIFIED
+
+1. **Database Migrations**:
+   - `V8__create_complaint_tables.sql`: Created `complaint` table with fields for tracking reports.
+   - `V9__create_location_tables.sql`: Created `complaint_location` table integrating PostGIS coordinates and exposure policies.
+   - `V10__create_workflow_tables.sql`: Created `workflow` and `workflow_transition` tables for complaint lifecycle state.
+   - `V11__create_evidence_tables.sql`: Created `evidence` table for managing photo/video uploads and metadata.
+
+2. **Backend Submission APIs & Entities**:
+   - Implemented JPA entities: `Complaint`, `ComplaintLocation`, `Workflow`, `WorkflowTransition`, `Evidence`.
+   - Built `ComplaintSubmissionService` orchestrating the creation of complaints, location, workflow state, and evidence records within a single transaction.
+   - `POST /api/v1/complaints`: Accepts `ComplaintSubmissionRequest`, handles citizen association from the security context, and returns the complaint UUID.
+
+3. **Automated Integration Tests**:
+   - `ComplaintControllerIntegrationTest`: **PASS** (Verifies successful complaint submission, transactional rollback on failure, location storage, workflow state creation, and evidence linkage).
+   - Resolved Hibernate native query sequence and `geometry` type compatibility using `ST_SetSRID(ST_MakePoint(...), 4326)`.
+
+4. **Frontend Implementation**:
+   - Built `/report/details` page in Next.js capturing exact location (latitude, longitude, exact address) and evidence upload metadata.
+   - Built `/report` (Reporting Wizard) integrating the previously built `CategoryLocationSelector`.
+   - Linked Next.js frontend to `POST /api/v1/complaints` and verified successful submission flows.
