@@ -1842,3 +1842,33 @@ New implementation areas include:
    - Created `RoutingEngineService` to evaluate complaints against active `RoutingRule` entries based on specificity and priority.
    - Created `AssignmentService` to assign complaints to an `AuthorityDepartment`.
    - Modified `ComplaintSubmissionServiceImpl` to trigger `RoutingEngineService` automatically on complaint submission.
+
+## V15 to V17 — SLA, Notification, and Audit Implementation
+
+### Status: IMPLEMENTED
+
+1. **Database Migrations**:
+   - `V15__create_sla_tables.sql`: Created `sla.sla_policy` (target resolution hours by category/severity) and `sla.complaint_sla` (per-complaint deadline tracking with pause support).
+   - `V16__create_notification_tables.sql`: Created `notification.notification` (logical message to a user) and `notification.notification_delivery` (delivery channel tracking: IN_APP, EMAIL, SMS).
+   - `V17__create_audit_tables.sql`: Created `audit.audit_event` (immutable append-only log with JSONB payload for capturing every key system action).
+
+2. **SLA Module** (`com.civictransparency.sla`):
+   - `SlaPolicy` + `ComplaintSla` entities and repositories.
+   - `SlaService.initializeSla()` — called automatically after routing; looks up the best matching policy by category + severity and sets a resolution deadline on the complaint.
+
+3. **Notification Module** (`com.civictransparency.notification`):
+   - `Notification` + `NotificationDelivery` entities and repositories.
+   - `NotificationService` — sends an IN_APP notification to the citizen (complaint routed acknowledgment) and to the assigned authority department (new assignment alert) immediately on routing.
+
+4. **Audit Module** (`com.civictransparency.audit`):
+   - `AuditEvent` entity and `AuditEventRepository`.
+   - `AuditService.log()` — uses `Propagation.REQUIRES_NEW` so audit entries are persisted even if the calling transaction rolls back, guaranteeing an immutable trail.
+   - Wired into `ComplaintSubmissionServiceImpl` (`COMPLAINT_SUBMITTED`) and `RoutingEngineService` (`COMPLAINT_ROUTED`).
+
+5. **Integration**:
+   - `RoutingEngineService` now coordinates the full post-routing lifecycle in one transaction: Assignment → SLA initialization → Notifications → Audit log.
+
+### What Remains (Next Phase)
+- **Authority Dashboard** (Next.js): Officials log in, view assigned complaints, and update status.
+- **Public Transparency Dashboard** (Next.js): Anonymized city-wide metrics for any visitor.
+- **Email/SMS delivery**: Plug a real provider (SendGrid, Twilio) into the `NotificationDelivery` pipeline.
