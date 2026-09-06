@@ -19,6 +19,7 @@ import com.civictransparency.geography.repository.WardRepository;
 import com.civictransparency.location.entity.ComplaintLocation;
 import com.civictransparency.location.entity.ExposurePolicy;
 import com.civictransparency.location.repository.ComplaintLocationRepository;
+import com.civictransparency.routing.service.RoutingEngineService;
 import com.civictransparency.workflow.entity.ComplaintState;
 import com.civictransparency.workflow.entity.Workflow;
 import com.civictransparency.workflow.repository.WorkflowRepository;
@@ -43,6 +44,7 @@ public class ComplaintSubmissionServiceImpl implements ComplaintSubmissionServic
     private final ComplaintSubcategoryRepository subcategoryRepository;
     private final CityRepository cityRepository;
     private final WardRepository wardRepository;
+    private final RoutingEngineService routingEngineService;
     private final GeometryFactory geometryFactory;
 
     public ComplaintSubmissionServiceImpl(
@@ -54,7 +56,8 @@ public class ComplaintSubmissionServiceImpl implements ComplaintSubmissionServic
             ComplaintCategoryRepository categoryRepository,
             ComplaintSubcategoryRepository subcategoryRepository,
             CityRepository cityRepository,
-            WardRepository wardRepository) {
+            WardRepository wardRepository,
+            RoutingEngineService routingEngineService) {
         this.complaintRepository = complaintRepository;
         this.locationRepository = locationRepository;
         this.workflowRepository = workflowRepository;
@@ -64,6 +67,7 @@ public class ComplaintSubmissionServiceImpl implements ComplaintSubmissionServic
         this.subcategoryRepository = subcategoryRepository;
         this.cityRepository = cityRepository;
         this.wardRepository = wardRepository;
+        this.routingEngineService = routingEngineService;
         this.geometryFactory = new GeometryFactory();
     }
 
@@ -148,6 +152,8 @@ public class ComplaintSubmissionServiceImpl implements ComplaintSubmissionServic
                 evidenceRepository.save(evidence);
             }
         }
+
+        routingEngineService.routeComplaint(complaint);
 
         return complaint.getComplaintId();
     }

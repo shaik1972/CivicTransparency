@@ -1827,3 +1827,18 @@ New implementation areas include:
    - Built `/report/details` page in Next.js capturing exact location (latitude, longitude, exact address) and evidence upload metadata.
    - Built `/report` (Reporting Wizard) integrating the previously built `CategoryLocationSelector`.
    - Linked Next.js frontend to `POST /api/v1/complaints` and verified successful submission flows.
+
+## V12 to V14 — Authority, Assignment, and Routing Implementation
+
+### Status: IMPLEMENTED
+
+1. **Database Migrations**:
+   - `V12__create_authority_tables.sql`: Created `authority`, `authority_department`, and `authority_user` tables.
+   - `V13__create_assignment_tables.sql`: Created `complaint_assignment` table for tracking assignments.
+   - `V14__create_routing_tables.sql`: Created `routing_rule` and `routing_decision` tables to handle automated routing logic.
+
+2. **Backend Submission APIs & Entities**:
+   - Created JPA entities and repositories for Authority, Assignment, and Routing modules.
+   - Created `RoutingEngineService` to evaluate complaints against active `RoutingRule` entries based on specificity and priority.
+   - Created `AssignmentService` to assign complaints to an `AuthorityDepartment`.
+   - Modified `ComplaintSubmissionServiceImpl` to trigger `RoutingEngineService` automatically on complaint submission.
