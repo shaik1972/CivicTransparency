@@ -19,6 +19,7 @@ import com.civictransparency.geography.repository.WardRepository;
 import com.civictransparency.location.entity.ComplaintLocation;
 import com.civictransparency.location.entity.ExposurePolicy;
 import com.civictransparency.location.repository.ComplaintLocationRepository;
+import com.civictransparency.audit.service.AuditService;
 import com.civictransparency.routing.service.RoutingEngineService;
 import com.civictransparency.workflow.entity.ComplaintState;
 import com.civictransparency.workflow.entity.Workflow;
@@ -45,6 +46,7 @@ public class ComplaintSubmissionServiceImpl implements ComplaintSubmissionServic
     private final CityRepository cityRepository;
     private final WardRepository wardRepository;
     private final RoutingEngineService routingEngineService;
+    private final AuditService auditService;
     private final GeometryFactory geometryFactory;
 
     public ComplaintSubmissionServiceImpl(
@@ -57,7 +59,8 @@ public class ComplaintSubmissionServiceImpl implements ComplaintSubmissionServic
             ComplaintSubcategoryRepository subcategoryRepository,
             CityRepository cityRepository,
             WardRepository wardRepository,
-            RoutingEngineService routingEngineService) {
+            RoutingEngineService routingEngineService,
+            AuditService auditService) {
         this.complaintRepository = complaintRepository;
         this.locationRepository = locationRepository;
         this.workflowRepository = workflowRepository;
@@ -68,6 +71,7 @@ public class ComplaintSubmissionServiceImpl implements ComplaintSubmissionServic
         this.cityRepository = cityRepository;
         this.wardRepository = wardRepository;
         this.routingEngineService = routingEngineService;
+        this.auditService = auditService;
         this.geometryFactory = new GeometryFactory();
     }
 
@@ -154,6 +158,13 @@ public class ComplaintSubmissionServiceImpl implements ComplaintSubmissionServic
         }
 
         routingEngineService.routeComplaint(complaint);
+
+        auditService.log(
+            "COMPLAINT_SUBMITTED",
+            null,
+            complaint.getComplaintId(),
+            "Complaint submitted with reference " + complaint.getComplaintReference()
+        );
 
         return complaint.getComplaintId();
     }
