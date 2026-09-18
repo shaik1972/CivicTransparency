@@ -12,12 +12,13 @@ import com.civictransparency.sla.service.SlaService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 
 @Service
 public class RoutingEngineService {
-    
+
     private final RoutingRuleRepository routingRuleRepository;
     private final RoutingDecisionRepository routingDecisionRepository;
     private final AssignmentService assignmentService;
@@ -26,11 +27,11 @@ public class RoutingEngineService {
     private final AuditService auditService;
 
     public RoutingEngineService(RoutingRuleRepository routingRuleRepository,
-                                RoutingDecisionRepository routingDecisionRepository,
-                                AssignmentService assignmentService,
-                                SlaService slaService,
-                                NotificationService notificationService,
-                                AuditService auditService) {
+            RoutingDecisionRepository routingDecisionRepository,
+            AssignmentService assignmentService,
+            SlaService slaService,
+            NotificationService notificationService,
+            AuditService auditService) {
         this.routingRuleRepository = routingRuleRepository;
         this.routingDecisionRepository = routingDecisionRepository;
         this.assignmentService = assignmentService;
@@ -48,23 +49,32 @@ public class RoutingEngineService {
         UUID subcategoryId = complaint.getSubcategory() != null ? complaint.getSubcategory().getSubcategoryId() : null;
 
         List<RoutingRule> rules = routingRuleRepository.findMatchingActiveRules(
-            stateId, cityId, wardId, categoryId, subcategoryId
-        );
+                stateId, cityId, wardId, categoryId, subcategoryId, complaint.getSeverity());
 
         if (rules.isEmpty()) {
+            slaService.initializeSla(complaint);
+            auditService.log(
+                    "COMPLAINT_ROUTING_UNRESOLVED",
+                    null,
+                    complaint.getComplaintId(),
+                    "No active routing rule matched complaint " + complaint.getComplaintReference());
             return;
         }
 
-        RoutingRule bestRule = rules.get(0); // Query already orders by priority DESC
-        
+        RoutingRule bestRule = rules.stream()
+                .max(Comparator.comparingInt((RoutingRule rule) -> getSpecificityScore(rule))
+                        .thenComparingInt(RoutingRule::getPriority))
+                .orElseThrow();
+
+        int specificityScore = getSpecificityScore(bestRule);
+
         RoutingDecision decision = new RoutingDecision(
-            UUID.randomUUID(),
-            complaint,
-            bestRule,
-            bestRule.getDepartment(),
-            bestRule.getPriority()
-        );
-        
+                UUID.randomUUID(),
+                complaint,
+                bestRule,
+                bestRule.getDepartment(),
+                specificityScore);
+
         routingDecisionRepository.save(decision);
 
         assignmentService.assignComplaint(complaint, bestRule.getDepartment());
@@ -75,11 +85,28 @@ public class RoutingEngineService {
         notificationService.notifyDepartmentAssigned(complaint, bestRule.getDepartment());
 
         auditService.log(
-            "COMPLAINT_ROUTED",
-            null,
-            complaint.getComplaintId(),
-            "Complaint routed to department: " + bestRule.getDepartment().getName(),
-            "{\"ruleId\":\"" + bestRule.getRuleId() + "\",\"departmentId\":\"" + bestRule.getDepartment().getDepartmentId() + "\"}"
-        );
+                "COMPLAINT_ROUTED",
+                null,
+                complaint.getComplaintId(),
+                "Complaint routed to department: " + bestRule.getDepartment().getName(),
+                "{\"ruleId\":\"" + bestRule.getRuleId() + "\",\"departmentId\":\""
+                        + bestRule.getDepartment().getDepartmentId() + "\"}");
+    }
+
+    private int getSpecificityScore(RoutingRule rule) {
+        int score = 0;
+        if (rule.getState() != null)
+            score++;
+        if (rule.getCity() != null)
+            score++;
+        if (rule.getWard() != null)
+            score++;
+        if (rule.getCategory() != null)
+            score++;
+        if (rule.getSubcategory() != null)
+            score++;
+        if (rule.getSeverity() != null)
+            score++;
+        return score;
     }
 }

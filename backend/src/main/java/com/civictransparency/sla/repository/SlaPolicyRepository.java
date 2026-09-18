@@ -11,9 +11,9 @@ import java.util.UUID;
 public interface SlaPolicyRepository extends JpaRepository<SlaPolicy, UUID> {
 
     @Query("SELECT p FROM SlaPolicy p WHERE p.isActive = true " +
-           "AND p.category.categoryId = :categoryId " +
-           "AND (p.subcategory IS NULL OR p.subcategory.subcategoryId = :subcategoryId) " +
-           "AND p.severity = :severity " +
-           "ORDER BY p.subcategory.subcategoryId NULLS LAST")
+            "AND p.category.categoryId = :categoryId " +
+            "AND (p.subcategory IS NULL OR p.subcategory.subcategoryId = :subcategoryId) " +
+            "AND p.severity = :severity " +
+            "ORDER BY CASE WHEN p.subcategory IS NULL THEN 0 ELSE 1 END DESC")
     Optional<SlaPolicy> findBestMatch(UUID categoryId, UUID subcategoryId, String severity);
 }

@@ -62,19 +62,77 @@ public class RoutingRule {
     @Column(name = "effective_to")
     private OffsetDateTime effectiveTo;
 
-    protected RoutingRule() {}
+    protected RoutingRule() {
+    }
 
-    public UUID getRuleId() { return ruleId; }
-    public String getName() { return name; }
-    public State getState() { return state; }
-    public City getCity() { return city; }
-    public Ward getWard() { return ward; }
-    public ComplaintCategory getCategory() { return category; }
-    public ComplaintSubcategory getSubcategory() { return subcategory; }
-    public Severity getSeverity() { return severity; }
-    public AuthorityDepartment getDepartment() { return department; }
-    public Integer getPriority() { return priority; }
-    public Boolean getIsActive() { return isActive; }
-    public OffsetDateTime getEffectiveFrom() { return effectiveFrom; }
-    public OffsetDateTime getEffectiveTo() { return effectiveTo; }
+    public RoutingRule(UUID ruleId, String name, State state, City city, Ward ward,
+            ComplaintCategory category, ComplaintSubcategory subcategory,
+            Severity severity, AuthorityDepartment department, Integer priority,
+            Boolean isActive, OffsetDateTime effectiveFrom, OffsetDateTime effectiveTo) {
+        this.ruleId = ruleId;
+        this.name = name;
+        this.state = state;
+        this.city = city;
+        this.ward = ward;
+        this.category = category;
+        this.subcategory = subcategory;
+        this.severity = severity;
+        this.department = department;
+        this.priority = priority;
+        this.isActive = isActive;
+        this.effectiveFrom = effectiveFrom;
+        this.effectiveTo = effectiveTo;
+    }
+
+    public UUID getRuleId() {
+        return ruleId;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public State getState() {
+        return state;
+    }
+
+    public City getCity() {
+        return city;
+    }
+
+    public Ward getWard() {
+        return ward;
+    }
+
+    public ComplaintCategory getCategory() {
+        return category;
+    }
+
+    public ComplaintSubcategory getSubcategory() {
+        return subcategory;
+    }
+
+    public Severity getSeverity() {
+        return severity;
+    }
+
+    public AuthorityDepartment getDepartment() {
+        return department;
+    }
+
+    public Integer getPriority() {
+        return priority;
+    }
+
+    public Boolean getIsActive() {
+        return isActive;
+    }
+
+    public OffsetDateTime getEffectiveFrom() {
+        return effectiveFrom;
+    }
+
+    public OffsetDateTime getEffectiveTo() {
+        return effectiveTo;
+    }
 }

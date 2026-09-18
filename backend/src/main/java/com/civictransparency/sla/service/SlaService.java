@@ -18,13 +18,17 @@ public class SlaService {
     private final ComplaintSlaRepository complaintSlaRepository;
 
     public SlaService(SlaPolicyRepository slaPolicyRepository,
-                      ComplaintSlaRepository complaintSlaRepository) {
+            ComplaintSlaRepository complaintSlaRepository) {
         this.slaPolicyRepository = slaPolicyRepository;
         this.complaintSlaRepository = complaintSlaRepository;
     }
 
     @Transactional
     public void initializeSla(Complaint complaint) {
+        if (complaintSlaRepository.findByComplaint_ComplaintId(complaint.getComplaintId()).isPresent()) {
+            return;
+        }
+
         UUID categoryId = complaint.getCategory().getCategoryId();
         UUID subcategoryId = complaint.getSubcategory() != null
                 ? complaint.getSubcategory().getSubcategoryId()

@@ -4,7 +4,7 @@
 >
 > **Authority:** This is a continuity document, not the architectural source of truth. The frozen documents under `docs/architecture/` and `docs/design/` remain authoritative.
 >
-> **Last updated:** 2026-09-15
+> **Last updated:** 2026-09-18
 
 ## 1. Project Overview
 
@@ -243,36 +243,73 @@ Status: **COMPLETE**.
 
 Do not modify an already-applied Flyway migration to change the schema. Create a new migration.
 
-## 9. Migration Roadmap
+## 9. Migration Progress
+
+The repository has applied migrations through V17. The historical roadmap in earlier versions of this document used a different numbering scheme; the migration files below are the current source of truth.
 
 ```text
 V1   Application schemas                  COMPLETE
-V2   Geography foundation                  NEXT
-V3   Identity + Citizen
-V4   Complaint + categories
-V5   Location + Evidence
-V6   Workflow
-V7   Authority + Assignment
-V8   Routing
-V9   SLA
-V10  Notification
-V11  Audit
-V12  Transparency projection
-V13  Analytics
-V14  Administration
+V2   Geography foundation                  COMPLETE
+V3   Identity + citizen                    COMPLETE
+V4   Identity reference roles               COMPLETE
+V5   Geography reference data               COMPLETE
+V6   Complaint categories                   COMPLETE
+V7   Bengaluru wards + localities           COMPLETE
+V8   Complaint tables                       COMPLETE
+V9   Location tables                        COMPLETE
+V10  Workflow tables                       COMPLETE
+V11  Evidence tables                        COMPLETE
+V12  Authority tables                       COMPLETE
+V13  Assignment tables                      COMPLETE
+V14  Routing tables                         COMPLETE
+V15  SLA tables                             COMPLETE
+V16  Notification tables                    COMPLETE
+V17  Audit tables                           COMPLETE
 ```
+
+V14 is **routing** in the implemented migration history, not administration. Administration, transparency, analytics, and moderation remain future slices. The `administration`, `transparency`, `analytics`, and `moderation` schemas were created by V1, but their domain migrations and application workflows have not yet been implemented.
+
+## 10. Current Implementation Status
+
+Completed backend foundation:
+- Citizen registration and authentication.
+- Geography and category lookup APIs.
+- Complaint submission with location, evidence, workflow initialization, and citizen complaint listing.
+- Authority, assignment, and routing domain entities, repositories, and services.
+- SLA, notification, and audit domain entities, repositories, and services.
+- Initial workflow transition recording when a complaint is submitted.
+
+Completed V12-V17 hardening:
+- Routing filters rules by complaint severity.
+- Routing selects the most specific matching rule, using priority as a tie-breaker.
+- Unresolved routing creates an audit event and still attempts SLA initialization.
+- SLA initialization is idempotent and policy matching prefers a subcategory-specific policy.
+- Routing rules and SLA policies have application-level constructors for configuration and tests.
+
+Validation completed on 2026-09-18:
+- Backend `gradlew build` passed.
+- Frontend `npm run lint` passed.
+- Frontend `npm run build` passed.
+- Complaint and notification integration tests passed.
+
+## 11. Pending Work Slices
+
+1. Add secured management APIs and configuration workflows for authorities, departments, authority users, routing rules, and SLA policies.
+2. Complete complaint operations for manual assignment, workflow state transitions, SLA pause/resume/resolve, and reassignment history.
+3. Complete notification operations for inbox listing, read state, delivery retries, and delivery status updates.
+4. Add audit query APIs and enforce append-only behavior at the application and database boundaries.
+5. Implement moderation tables and workflows for evidence/media review.
+6. Implement the transparency projection and public complaint/dashboard APIs.
+7. Implement analytics projections and complaint metrics.
+8. Connect the frontend dashboard, report details, authority operations, notifications, and status history to backend APIs.
+9. Add matching-rule integration coverage that proves V12-V16 records are created during a routed complaint flow.
+10. Update deployment, observability, privacy, authorization, and operational documentation for production use.
 
 The exact boundaries may change only when a genuine dependency requires it. Avoid artificial micro-migrations.
 
-## 10. Immediate Next Task — V2 Geography
+## 12. Geography Reference Model
 
-File:
-
-`backend/src/main/resources/db/migration/V2__create_geography_tables.sql`
-
-V2 should create structure only. Do not seed Karnataka/Bengaluru or other reference data yet.
-
-Hierarchy:
+The V2-V7 geography work established this hierarchy:
 
 ```text
 state
@@ -323,7 +360,7 @@ Agreed implementation decisions:
 - Do not add unapproved business attributes.
 - No geography seed data in V2.
 
-## 11. Migration Workflow
+## 13. Migration Workflow
 
 For every migration:
 
@@ -339,7 +376,7 @@ For every migration:
 
 Flyway owns schema evolution. Hibernate/JPA must not compete with Flyway for schema creation/update.
 
-## 12. Current Gradle Memory Configuration
+## 14. Current Gradle Memory Configuration
 
 `backend/gradle.properties`:
 
@@ -352,7 +389,7 @@ The laptop has approximately 5.85 GB visible RAM. Earlier JVM/Gradle failures we
 
 Do not increase JVM/Gradle memory aggressively without checking available RAM.
 
-## 13. Runtime / Database Issues Already Resolved
+## 15. Runtime / Database Issues Already Resolved
 
 ### JVM memory
 An earlier `bootRun` failed because available RAM was extremely low. Later the Spring Boot application successfully started on port 8080.
@@ -369,7 +406,7 @@ A later `clean build` completed successfully.
 ### PostGIS
 PostGIS 3.6.2 was installed for PostgreSQL 18 using StackBuilder and enabled successfully.
 
-## 14. Git Baseline
+## 16. Git Baseline
 
 Current branch:
 
@@ -388,7 +425,7 @@ The working tree was clean after the baseline commit.
 
 The baseline includes the backend foundation, Gradle configuration, Flyway V1, tests, architecture documents, detailed design/database documents and Git ignore configuration.
 
-## 15. Git / Secret Rules
+## 17. Git / Secret Rules
 
 Never commit:
 - passwords
@@ -402,7 +439,7 @@ Never commit:
 - temporary files
 - local tool/session data
 
-## 16. Development Philosophy
+## 18. Development Philosophy
 
 - Architecture first, implementation second.
 - Frozen design is the baseline.
@@ -416,7 +453,7 @@ Never commit:
 - Do not expose PII through public or operational APIs.
 - Avoid over-engineering.
 
-## 17. Resume Instructions for a New ChatGPT Session
+## 19. Resume Instructions for a New ChatGPT Session
 
 Start a new session with:
 
@@ -428,7 +465,7 @@ For database work, prioritize:
 3. Detailed Design Part 2B / ER Model & Data Dictionary.
 4. This context document.
 
-## 18. Current Position
+## 20. Current Position
 
 ```text
 Architecture                         COMPLETE / FROZEN
@@ -445,7 +482,7 @@ NEXT:
 V2__create_geography_tables.sql
 ```
 
-## 19. Critical Decisions Not to Lose
+## 21. Critical Decisions Not to Lose
 
 1. Citizen PII is isolated from complaint/public data.
 2. Citizen identity must be protected from authorities where applicable.

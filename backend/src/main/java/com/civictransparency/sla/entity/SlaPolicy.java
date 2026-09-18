@@ -30,12 +30,40 @@ public class SlaPolicy {
     @Column(name = "is_active", nullable = false)
     private Boolean isActive;
 
-    protected SlaPolicy() {}
+    protected SlaPolicy() {
+    }
 
-    public UUID getPolicyId() { return policyId; }
-    public ComplaintCategory getCategory() { return category; }
-    public ComplaintSubcategory getSubcategory() { return subcategory; }
-    public String getSeverity() { return severity; }
-    public Integer getTargetHours() { return targetHours; }
-    public Boolean getIsActive() { return isActive; }
+    public SlaPolicy(UUID policyId, ComplaintCategory category, ComplaintSubcategory subcategory,
+            String severity, Integer targetHours, Boolean isActive) {
+        this.policyId = policyId;
+        this.category = category;
+        this.subcategory = subcategory;
+        this.severity = severity;
+        this.targetHours = targetHours;
+        this.isActive = isActive;
+    }
+
+    public UUID getPolicyId() {
+        return policyId;
+    }
+
+    public ComplaintCategory getCategory() {
+        return category;
+    }
+
+    public ComplaintSubcategory getSubcategory() {
+        return subcategory;
+    }
+
+    public String getSeverity() {
+        return severity;
+    }
+
+    public Integer getTargetHours() {
+        return targetHours;
+    }
+
+    public Boolean getIsActive() {
+        return isActive;
+    }
 }

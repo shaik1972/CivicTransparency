@@ -3,6 +3,7 @@ package com.civictransparency.complaint.controller;
 import com.civictransparency.citizen.entity.CitizenProfile;
 import com.civictransparency.citizen.repository.CitizenProfileRepository;
 import com.civictransparency.auth.service.AccessTokenService;
+import com.civictransparency.audit.repository.AuditEventRepository;
 import com.civictransparency.complaint.repository.ComplaintRepository;
 import com.civictransparency.evidence.repository.EvidenceRepository;
 import com.civictransparency.identity.entity.UserAccount;
@@ -56,6 +57,9 @@ class ComplaintControllerIntegrationTest {
 
     @Autowired
     private EvidenceRepository evidenceRepository;
+
+    @Autowired
+    private AuditEventRepository auditEventRepository;
 
     @Autowired
     private AccessTokenService accessTokenService;
@@ -139,5 +143,10 @@ class ComplaintControllerIntegrationTest {
         var evList = evidenceRepository.findByComplaintComplaintIdOrderByCreatedAtAsc(complaintId);
         assertEquals(1, evList.size());
         assertEquals("s3://civic-bucket/pothole1.jpg", evList.get(0).getStorageKey());
+
+        var auditEvents = auditEventRepository.findByComplaintIdOrderByCreatedAtAsc(complaintId);
+        assertEquals(2, auditEvents.size());
+        assertEquals("COMPLAINT_ROUTING_UNRESOLVED", auditEvents.get(0).getEventType());
+        assertEquals("COMPLAINT_SUBMITTED", auditEvents.get(1).getEventType());
     }
 }
