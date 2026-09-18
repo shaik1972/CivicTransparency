@@ -1,25 +1,25 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { getAuthHeaders, readSession } from "@/lib/auth";
 
-export default function ReportDetailsPage() {
+const API_BASE_URL = "http://localhost:8080";
+
+function ReportDetailsForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
   const [loading, setLoading] = useState(false);
   const [description, setDescription] = useState("");
   
-  // Fake citizen id from V4 seeded data
-  const DEMO_CITIZEN_ID = "11111111-1111-1111-1111-111111111111";
-
   const categoryId = searchParams.get("categoryId");
   const subcategoryId = searchParams.get("subcategoryId");
   const cityId = searchParams.get("cityId");
   const wardId = searchParams.get("wardId");
 
   useEffect(() => {
-    if (!categoryId || !cityId) {
+    if (!categoryId || !cityId || !readSession()) {
       router.push("/report");
     }
   }, [categoryId, cityId, router]);
@@ -29,8 +29,15 @@ export default function ReportDetailsPage() {
     setLoading(true);
 
     try {
+      const session = readSession();
+      const citizenId = session?.citizenId;
+      if (!session || !citizenId) {
+        router.push("/");
+        return;
+      }
+
       const payload = {
-        citizenId: DEMO_CITIZEN_ID,
+        citizenId,
         categoryId: categoryId,
         subcategoryId: subcategoryId,
         description: description,
@@ -47,9 +54,12 @@ export default function ReportDetailsPage() {
         ]
       };
 
-      const res = await fetch("/api/v1/complaints", {
+      const res = await fetch(`${API_BASE_URL}/api/v1/complaints`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...getAuthHeaders(),
+        },
         body: JSON.stringify(payload)
       });
 
@@ -134,5 +144,13 @@ export default function ReportDetailsPage() {
         </form>
       </div>
     </div>
+  );
+}
+
+export default function ReportDetailsPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-slate-50" />}>
+      <ReportDetailsForm />
+    </Suspense>
   );
 }

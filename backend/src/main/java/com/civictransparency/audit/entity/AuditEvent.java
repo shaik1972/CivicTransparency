@@ -1,6 +1,8 @@
 package com.civictransparency.audit.entity;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.OffsetDateTime;
 import java.util.UUID;
@@ -22,6 +24,7 @@ public class AuditEvent {
     @Column(name = "complaint_id")
     private UUID complaintId;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "payload", columnDefinition = "jsonb")
     private String payload;
 
@@ -31,9 +34,11 @@ public class AuditEvent {
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;
 
-    protected AuditEvent() {}
+    protected AuditEvent() {
+    }
 
-    public AuditEvent(UUID eventId, String eventType, UUID actorUserId, UUID complaintId, String description, String payload) {
+    public AuditEvent(UUID eventId, String eventType, UUID actorUserId, UUID complaintId, String description,
+            String payload) {
         this.eventId = eventId;
         this.eventType = eventType;
         this.actorUserId = actorUserId;
@@ -43,11 +48,31 @@ public class AuditEvent {
         this.createdAt = OffsetDateTime.now();
     }
 
-    public UUID getEventId() { return eventId; }
-    public String getEventType() { return eventType; }
-    public UUID getActorUserId() { return actorUserId; }
-    public UUID getComplaintId() { return complaintId; }
-    public String getPayload() { return payload; }
-    public String getDescription() { return description; }
-    public OffsetDateTime getCreatedAt() { return createdAt; }
+    public UUID getEventId() {
+        return eventId;
+    }
+
+    public String getEventType() {
+        return eventType;
+    }
+
+    public UUID getActorUserId() {
+        return actorUserId;
+    }
+
+    public UUID getComplaintId() {
+        return complaintId;
+    }
+
+    public String getPayload() {
+        return payload;
+    }
+
+    public String getDescription() {
+        return description;
+    }
+
+    public OffsetDateTime getCreatedAt() {
+        return createdAt;
+    }
 }

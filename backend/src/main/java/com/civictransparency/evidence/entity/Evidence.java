@@ -2,6 +2,8 @@ package com.civictransparency.evidence.entity;
 
 import com.civictransparency.complaint.entity.Complaint;
 import jakarta.persistence.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.OffsetDateTime;
 import java.util.UUID;
@@ -27,7 +29,8 @@ public class Evidence {
     @Column(name = "file_size_bytes", nullable = false)
     private Long fileSizeBytes;
 
-    @Column(name = "sha256", nullable = false, columnDefinition = "CHAR(64)")
+    @JdbcTypeCode(SqlTypes.CHAR)
+    @Column(name = "sha256", nullable = false, length = 64)
     private String sha256;
 
     @Column(name = "duration_seconds")

@@ -17,6 +17,7 @@ import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.UUID;
 
 @Service
 @Transactional
@@ -30,6 +31,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     private final PasswordHashingService passwordHashingService;
     private final AccessTokenService accessTokenService;
     private final long tokenTtlMinutes;
+    private final long refreshTokenTtlMinutes;
 
     public AuthenticationServiceImpl(
             UserAccountRepository userAccountRepository,
@@ -37,13 +39,15 @@ public class AuthenticationServiceImpl implements AuthenticationService {
             CitizenProfileRepository citizenProfileRepository,
             PasswordHashingService passwordHashingService,
             AccessTokenService accessTokenService,
-            @Value("${civic.auth.token-ttl-minutes}") long tokenTtlMinutes) {
+            @Value("${civic.auth.token-ttl-minutes}") long tokenTtlMinutes,
+            @Value("${civic.auth.refresh-ttl-minutes:10080}") long refreshTokenTtlMinutes) {
         this.userAccountRepository = userAccountRepository;
         this.userRoleRepository = userRoleRepository;
         this.citizenProfileRepository = citizenProfileRepository;
         this.passwordHashingService = passwordHashingService;
         this.accessTokenService = accessTokenService;
         this.tokenTtlMinutes = tokenTtlMinutes;
+        this.refreshTokenTtlMinutes = refreshTokenTtlMinutes;
     }
 
     @Override
@@ -69,10 +73,41 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         user.setLastLoginAt(OffsetDateTime.now());
         userAccountRepository.save(user);
 
+        OffsetDateTime refreshExpiresAt = OffsetDateTime.now().plusMinutes(refreshTokenTtlMinutes);
+        String refreshToken = accessTokenService.issueRefresh(user.getUserId(), roles, refreshExpiresAt);
+
         return new LoginResponse(
                 accessTokenService.issue(user.getUserId(), roles, expiresAt),
+                refreshToken,
                 "Bearer",
                 expiresAt,
+                user.getUserId(),
+                profile.getCitizenId(),
+                user.getUsername(),
+                profile.getPublicAlias(),
+                roles);
+    }
+
+    @Override
+    public LoginResponse refresh(String refreshToken) {
+                UUID userId = accessTokenService.verifyRefresh(refreshToken);
+        List<String> roles = accessTokenService.getRoles(refreshToken);
+
+        UserAccount user = userAccountRepository.findById(userId)
+                .orElseThrow(InvalidCredentialsException::new);
+        CitizenProfile profile = citizenProfileRepository.findByUserUserId(userId)
+                .orElseThrow(InvalidCredentialsException::new);
+
+        OffsetDateTime accessExpiresAt = OffsetDateTime.now().plusMinutes(tokenTtlMinutes);
+        OffsetDateTime refreshExpiresAt = OffsetDateTime.now().plusMinutes(refreshTokenTtlMinutes);
+        String newAccessToken = accessTokenService.issue(userId, roles, accessExpiresAt);
+        String newRefreshToken = accessTokenService.issueRefresh(userId, roles, refreshExpiresAt);
+
+        return new LoginResponse(
+                newAccessToken,
+                newRefreshToken,
+                "Bearer",
+                accessExpiresAt,
                 user.getUserId(),
                 profile.getCitizenId(),
                 user.getUsername(),

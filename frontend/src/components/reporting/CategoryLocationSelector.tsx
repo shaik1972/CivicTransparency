@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 
 const API_BASE_URL = "http://localhost:8080";
 
@@ -85,9 +84,8 @@ function priorityBadge(priority: string) {
 
 export default function CategoryLocationSelector({
   cityId,
-  onSelectionChange,
+  onSelectionChange
 }: Props) {
-  const router = useRouter();
   // Category state
   const [categories, setCategories] = useState<Category[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
@@ -141,8 +139,6 @@ export default function CategoryLocationSelector({
   // ── Fetch localities when ward changes ────────────────────────────────────
   useEffect(() => {
     if (!selectedWard) {
-      setLocalities([]);
-      setSelectedLocality(null);
       return;
     }
     async function fetchLocalities() {
@@ -213,27 +209,13 @@ export default function CategoryLocationSelector({
   function handleWardChange(wardId: string) {
     const ward = wards.find((w) => w.wardId === wardId) ?? null;
     setSelectedWard(ward);
+    setLocalities([]);
     setSelectedLocality(null);
   }
 
   function handleLocalityChange(localityId: string) {
     const loc = localities.find((l) => l.localityId === localityId) ?? null;
     setSelectedLocality(loc);
-  }
-
-  function handleContinue() {
-    if (selectedCategory && selectedSubcategory && selectedWard && selectedLocality) {
-      const params = new URLSearchParams({
-        categoryId: selectedCategory.categoryId,
-        subcategoryId: selectedSubcategory.subcategoryId,
-        wardId: selectedWard.wardId,
-        localityId: selectedLocality.localityId,
-      });
-      if (streetAddress) params.append("streetAddress", streetAddress);
-      if (landmark) params.append("landmark", landmark);
-      
-      router.push(`/report/details?${params.toString()}`);
-    }
   }
 
   // ─── Render ───────────────────────────────────────────────────────────────

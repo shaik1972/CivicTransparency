@@ -1,6 +1,7 @@
 package com.civictransparency.common.exception;
 
 import com.civictransparency.auth.exception.InvalidCredentialsException;
+import com.civictransparency.auth.exception.InvalidAccessTokenException;
 import com.civictransparency.common.dto.ApiErrorResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
@@ -24,6 +25,21 @@ public class GlobalExceptionHandler {
                                 HttpStatus.UNAUTHORIZED.value(),
                                 "INVALID_CREDENTIALS",
                                 "The email or username and password combination is not valid.",
+                                request.getRequestURI());
+
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
+        }
+
+        @ExceptionHandler(InvalidAccessTokenException.class)
+        public ResponseEntity<ApiErrorResponse> handleInvalidAccessToken(
+                        InvalidAccessTokenException ex,
+                        HttpServletRequest request) {
+
+                ApiErrorResponse response = new ApiErrorResponse(
+                                OffsetDateTime.now(),
+                                HttpStatus.UNAUTHORIZED.value(),
+                                "INVALID_ACCESS_TOKEN",
+                                "The access token is missing, invalid or expired.",
                                 request.getRequestURI());
 
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);

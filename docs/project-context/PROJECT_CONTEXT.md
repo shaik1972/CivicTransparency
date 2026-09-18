@@ -4,7 +4,7 @@
 >
 > **Authority:** This is a continuity document, not the architectural source of truth. The frozen documents under `docs/architecture/` and `docs/design/` remain authoritative.
 >
-> **Last updated:** 2026-08-24
+> **Last updated:** 2026-09-15
 
 ## 1. Project Overview
 
@@ -1492,7 +1492,7 @@ This section supersedes those earlier status statements where they conflict with
 
 The authoritative current position is:
 
-> **V3 backend application implementation is now implemented and automated-test verified. The current remaining work is HTTP/API verification, browser verification, regression verification, final Git review and V3 commit.**
+> **V3 backend application implementation is implemented and automated-test verified. The current remaining work is final browser regression, production hardening, and the final Git review/commit.**
 
 The memory limitation of the development laptop is an environment constraint and must continue to be considered when selecting Gradle/JVM test commands.
 
@@ -1743,132 +1743,390 @@ New implementation areas include:
 * `src/main/resources/static/`
 * `src/test/java/com/civictransparency/citizen/`
 * `src/test/java/com/civictransparency/identity/`
-* `src/test/java/com/civictransparency/auth/`
-* `frontend/`
+
+## V3 Registration — Frontend Integration, CORS & Verification Delta
+
+### Frontend Initialization
+
+* Created frontend under:
+  `C:\Kareem\Code\CivicTransparency\frontend`
+* Frontend stack:
+
+  * Next.js 16.3.4
+  * TypeScript
+  * Tailwind CSS
+  * App Router
+  * Node.js 24.20.0
+  * npm 11.4.2
+* Next.js application created using `create-next-app@16.3.4`.
+* Frontend linting verified successfully with `npm run lint`.
+* Login UI is present but authentication/security implementation is still pending.
+
+### Citizen Registration UI
+
+Implemented the citizen registration UI in `AuthPanel.tsx`.
+
+Registration currently supports:
+
+* Email
+* Optional username
+* Password
+* Confirm password
+* Public alias
+* Phone
+* Address
+* State
+* City
+* Optional postal code
+
+UI behavior:
+
+* Required fields are marked with a red `*`.
+* Optional fields are explicitly labelled `(optional)`.
+* Browser-native required-field and email validation is active.
+* Password/confirm-password mismatch is validated before submission.
+* State list is loaded dynamically from the backend.
+* City list is loaded dynamically based on the selected state.
+* City selection is reset when the state changes.
+* Registration success/error messages are displayed in the UI.
+* Registration panel supports vertical scrolling.
+
+### Geography Integration
+
+Frontend consumes:
+
+* `GET /api/v1/geography/states`
+* `GET /api/v1/geography/states/{stateId}/cities`
+
+Current seeded geography used for E2E verification:
+
+* Karnataka — code `KA`
+* Bengaluru — code `BLR`
+
+### CORS
+
+Added:
+
+`backend/src/main/java/com/civictransparency/common/config/CorsConfig.java`
+
+Configured backend CORS for the local frontend:
+
+* Origin: `http://localhost:3000`
+* API mapping: `/api/**`
+* Methods: GET, POST, PUT, PATCH, DELETE, OPTIONS
+* Headers: all
+
+This resolved browser cross-origin access between the Next.js frontend (`localhost:3000`) and Spring Boot backend (`localhost:8080`).
+
+### Citizen Registration API
+
+Registration endpoint:
+
+`POST /api/v1/citizens/register`
+
+Current registration response contains:
+
+* `citizenId`
+* `userId`
+* `username`
+* `publicAlias`
+* `profileStatus`
+* `accountStatus`
+* `roleCode`
+
+Backend registration flow:
+
+1. Validate registration DTO.
+2. Validate password confirmation.
+3. Check duplicate email.
+4. Check duplicate username when supplied.
+5. Hash password.
+6. Create user account.
+7. Assign `CITIZEN` role.
+8. Create citizen profile.
+9. Encrypt/store contact information.
+10. Encrypt/store address information.
+11. Return registration response.
+
+### Duplicate Registration Handling
+
+Previously duplicate email/username checks threw `IllegalArgumentException`, which resulted in HTTP 500 through the generic exception handler.
+
+Implemented:
+
+`DuplicateRegistrationException`
+
+and corresponding `GlobalExceptionHandler` handling.
+
+Duplicate registration now returns:
+
+* HTTP `409 CONFLICT`
+* Code: `DUPLICATE_REGISTRATION`
+
+Messages:
+
+* Duplicate email: `An account with this email already exists.`
+* Duplicate username: `This username is already in use.`
+
+An automated integration test was added for duplicate email handling.
+
+### Invalid City Validation
+
+During negative testing, an invalid/non-existent `cityId` initially resulted in:
+
+* PostgreSQL foreign-key violation
+* HTTP `500 INTERNAL SERVER ERROR`
+
+Database verification confirmed that the failed transaction did not create a user account.
+
+The address service was then enhanced to validate the supplied city before attempting the address insert using the existing `CityRepository.existsById()`.
+
+Current behavior:
+
+* `cityId = null` → allowed
+* Existing city UUID → allowed
+* Non-existent city UUID → HTTP `400 BAD REQUEST`
+* Code: `INVALID_REGISTRATION_DATA`
+
+The database foreign-key constraint remains as the final integrity safeguard.
+
+### Successful End-to-End Registration Verification
+
+Verified through the browser UI:
+
+* Karnataka displayed in the state dropdown.
+* Bengaluru displayed after selecting Karnataka.
+* Registration completed successfully.
+* UI displayed:
+
+  * `Registration successful.`
+  * `Welcome, E2E Test Citizen.`
+  * `Your account has been created successfully.`
+
+Database verification confirmed creation of:
+
+* `identity.user_account`
+* `citizen.citizen_profile`
+* `citizen.citizen_address`
+
+The citizen address was correctly associated with the seeded Bengaluru city.
+
+### Negative / Boundary UI & API Verification
+
+The following registration scenarios have been tested successfully:
+
+1. Password mismatch — browser/UI validation passed.
+2. City not selected — browser required-field validation passed.
+3. Invalid email — browser email validation passed.
+4. Short password — backend validation returned `INVALID_REGISTRATION_DATA`.
+5. Duplicate email — HTTP 409 / `DUPLICATE_REGISTRATION`.
+6. Missing required field — browser required-field validation passed.
+7. Duplicate username — HTTP 409 / `DUPLICATE_REGISTRATION`.
+8. Optional username and postal code blank — registration succeeded.
+9. Non-existent `cityId` through API — HTTP 400 / `INVALID_REGISTRATION_DATA`.
+10. Invalid-city transaction — verified that no partial `identity.user_account` row was created.
+
+### Automated Verification Status
+
+After the registration changes:
+
+`.\gradlew clean test`
+
+completed successfully.
+
+Latest result:
+
+* `BUILD SUCCESSFUL`
+* 5 actionable tasks executed
+* Existing automated tests continue to pass.
+
+Frontend linting also passes with:
+
+`npm run lint`
+
+### Current V3 Status
+
+Citizen registration is now verified across:
+
+`Next.js UI → CORS → Spring Boot Controller → DTO Validation → Registration Service → Identity/Citizen Services → PostgreSQL → Transaction/Rollback`
+
+The registration flow is considered functionally verified for the currently implemented scope.
+
+Authentication/login, session/token security, authorization, and subsequent citizen issue-reporting functionality remain to be implemented and verified.
 
 
-## V5 — Login & Authentication Verification Checkpoint
+## Current Project Checkpoint — Complaint Submission Foundation
 
-### Status: COMPLETED & VERIFIED
+**Date:** 15-Sep-2026
 
-1. **Authentication Endpoint**: `POST /api/v1/auth/login`
-   - Supports login via email or username.
-   - BCrypt password matching.
-   - Issues HMAC-SHA256 JWT access tokens containing user ID, roles, issue timestamp, and expiration.
-   - Updates `UserAccount.lastLoginAt`.
+This section supersedes earlier status statements where they conflict with the current repository state. Historical checkpoint sections above are retained for continuity.
 
-2. **Backend Foundation & Security Configurations**:
-   - `build.gradle`: Added `jackson-databind` dependency for JWT JSON payload serialization in `HmacAccessTokenService`.
-   - `com.civictransparency.common.config.JacksonConfig`: Created `@Configuration` bean for `ObjectMapper`.
-   - `CitizenProfile`: Added 3-argument constructor (`UserAccount`, `publicAlias`, `profileStatus`) for entity and test setup.
-   - `HmacAccessTokenService`: Added fallback initialization for `ObjectMapper`.
-   - `application.properties` & `src/test/resources/application.properties`: Configured local database datasource properties, PostgreSQL driver, and HMAC token secret key (`civic.auth.token-secret`).
+### Current Git checkpoint
 
-3. **Automated Integration Tests**:
-   - `AuthenticationControllerIntegrationTest`: **PASS** (3/3 tests passed, covering email login, username login, and non-disclosing invalid credentials HTTP 401 error handling).
-   - `CitizenRegistrationControllerIntegrationTest`: **PASS** (6/6 tests passed).
+Current branch and commit:
 
-4. **Frontend Integration & Redirect**:
-   - Next.js UI (`frontend/src/components/auth/AuthPanel.tsx`) connected to login API (`POST /api/v1/auth/login`), stores tokens/metadata in `sessionStorage`, and redirects authenticated citizens to `/dashboard` via `router.push('/dashboard')`.
-   - Next.js Citizen Dashboard page (`frontend/src/app/dashboard/page.tsx`): Dedicated portal displaying welcome banner, user public alias, `@username`, `CITIZEN` role badge, real-time stat card counters, quick action cards (Report Issue, Browse Public Dashboard, Privacy & Profile), session protection (redirects unauthenticated visitors to `/`), and Sign Out action.
+```text
+master
+769f1a6 Implement Complaint Submission flow with V8-V11 migrations
+```
 
-5. **Single Source of Truth**:
-   - `docs/project-context/PROJECT_CONTEXT.md` serves as the sole continuity source of truth.
+The working tree was clean before this documentation update.
+
+Recent completed milestones:
+
+* `545ca21` — citizen registration, authentication and Next.js integration.
+* `49d0581` — citizen dashboard and post-login redirect.
+* `7c652f6` — complaint categories, geography hierarchy APIs and category/location selection UI.
+* `769f1a6` — complaint submission foundation, location/evidence persistence and workflow initialization.
+
+### Database and Flyway status
+
+Flyway migrations currently present are:
+
+```text
+V1  create application schemas                         COMPLETE
+V2  create geography tables                            COMPLETE
+V3  create identity and citizen tables                COMPLETE
+V4  seed identity reference roles                      COMPLETE
+V5  seed geography reference data                      COMPLETE
+V6  create and seed complaint categories               COMPLETE
+V7  seed Bengaluru wards and localities                 COMPLETE
+V8  create complaint tables                             COMPLETE
+V9  create location tables                              COMPLETE
+V10 create workflow tables                              COMPLETE
+V11 create evidence tables                              COMPLETE
+V12 transparency projection                             NOT STARTED
+V13 analytics                                          NOT STARTED
+V14 administration                                     NOT STARTED
+```
+
+The V8-V11 schema foundation currently includes:
+
+* Complaint records and category/subcategory references in the `complaint` schema.
+* Exact operational location, exposure policy and public geometry fields in `location.complaint_location`.
+* Complaint lifecycle state and transition history in `workflow.workflow` and `workflow.workflow_transition`.
+* Evidence metadata and media moderation records in `evidence.evidence` and `evidence.media_moderation`.
+* PostGIS geography/geometry columns and GIST indexes for location queries.
+
+The V6/V7 reference data provides complaint categories/subcategories and seeded Bengaluru wards/localities. The category and location design is documented in [Category_and_Location_Selection_Design_Plan.md](../../docs/design/Category_and_Location_Selection_Design_Plan.md). The frozen architecture and database design remain authoritative; these implementation notes do not change them.
+
+### Implemented backend application surface
+
+The current Spring Boot modular monolith contains these verified application areas:
+
+* Identity and citizen registration, including BCrypt password hashing, PII encryption, role assignment and validation/error handling.
+* Authentication through `POST /api/v1/auth/login`, accepting an email or username and returning a bearer-style HMAC access token, expiry, public alias and roles.
+* Geography read APIs:
+  * `GET /api/v1/geography/states`
+  * `GET /api/v1/geography/states/{stateId}/cities`
+  * `GET /api/v1/geography/cities/{cityId}/wards`
+  * `GET /api/v1/geography/wards/{wardId}/localities`
+* Category read API: `GET /api/v1/categories`.
+* Complaint submission through `POST /api/v1/complaints`.
+
+The current complaint submission service creates the complaint, derives severity from the selected category/subcategory, creates the initial `SUBMITTED` workflow, persists optional location data, and persists evidence metadata in one transactional operation. The controller returns HTTP `201` with the generated `complaintId`.
+
+The current complaint request includes citizen/category/geography identifiers, description, optional title/subcategory, optional latitude/longitude/accuracy/description, and evidence metadata. Actual multipart upload and object-storage integration are not implemented yet; the current web flow submits mock evidence metadata.
+
+### Implemented frontend application surface
+
+The Next.js frontend currently includes:
+
+* `/` — combined landing, registration and login experience.
+* `/dashboard` — session-backed citizen portal with sign-out and report-issue navigation.
+* `/report` — category, subcategory, city, ward and locality selection flow.
+* `/report/details` — complaint description and simulated evidence submission form.
+
+The frontend uses Next.js `16.3.4`, React `19.2.8`, TypeScript, Tailwind CSS and the App Router. It calls the local Spring Boot API at `http://localhost:8080` and uses the configured local CORS policy for browser access.
+
+Current frontend limitations:
+
+* The complaint form derives the citizen UUID from the successful login session and forwards the bearer token. Complaint creation and citizen complaint retrieval validate the signed token; broader HTTP authentication coverage remains pending.
+* The selected city is currently seeded to Bengaluru in the report flow.
+* File selection is visual only; no file bytes are uploaded and evidence metadata is simulated.
+* Dashboard complaint counts and recent reports now load from the authenticated citizen complaint API; public metrics remain placeholders and transparency/analytics APIs are not implemented.
+* Token storage currently uses browser `sessionStorage`; production-grade token lifecycle, refresh/revocation and route/API authorization remain pending.
+
+### Automated verification status
+
+The repository contains integration tests for:
+
+* Spring Boot application context loading.
+* Identity and role repositories.
+* Citizen registration and validation/error cases.
+* Authentication by email and username, invalid-password handling and token issuance.
+* Geography hierarchy APIs.
+* Category APIs.
+* Atomic complaint submission, including complaint, location, workflow and evidence persistence.
+
+Previously recorded backend verification for the registration/authentication/category/geography slices was green before the V8-V11 implementation. The latest complaint implementation includes `ComplaintControllerIntegrationTest`, designed to verify HTTP `201`, generated complaint ID, derived severity, complaint reference, location persistence, initial `SUBMITTED` workflow state and evidence metadata persistence.
+
+Current verification result on 15-Sep-2026:
+
+* The targeted `ComplaintControllerIntegrationTest` passes after aligning the audit JSONB mapping and correcting the complaint fixture to use the seeded category/subcategory IDs.
+* The full backend suite passes with `backend\\gradlew.bat test --no-daemon`.
+* The evidence `sha256` PostgreSQL `CHAR(64)` mapping mismatch is fixed with an explicit Hibernate `CHAR` JDBC type.
+* Frontend lint and the Next.js production build pass after the authenticated identity handoff, complaint dashboard, and route Suspense fixes. Full browser regression verification remains pending.
+
+The current `application.properties` also contains local datasource credentials and fallback cryptographic configuration. These values must be reviewed and externalized before any production use or repository sharing; no secret values are recorded here.
+
+Frontend linting has previously passed with `npm run lint`. A fresh full backend test and frontend lint run should be performed after any subsequent implementation changes and before the next milestone commit.
+
+### Authoritative current position
+
+```text
+Architecture and detailed design                 COMPLETE / FROZEN
+Database migrations V1-V11                       IMPLEMENTED
+Identity/citizen registration                     IMPLEMENTED and verified
+Authentication/login                              IMPLEMENTED and integration-tested
+Category/geography selection                      IMPLEMENTED and integration-tested
+Complaint submission foundation                   IMPLEMENTED and integration-tested
+Workflow initialization                           IMPLEMENTED for initial SUBMITTED state
+Location/evidence metadata persistence            IMPLEMENTED
+Public transparency projection                    NOT STARTED
+Analytics and administration                      NOT STARTED
+Authority routing, assignment and SLA             NOT STARTED
+Real media upload/moderation pipeline              NOT STARTED
+Production authorization/token lifecycle           PARTIAL (complaint APIs validate signed bearer tokens)
+Full backend verification                          GREEN (`backend\\gradlew.bat test --no-daemon`)
+Frontend lint verification                         GREEN (`npm run lint`)
+Frontend production build verification            GREEN (`npm run build`)
+Full browser regression verification               PENDING (manual browser check not yet run)
+```
+
+### Active issue tracker
+
+1. Issue 01 — Hibernate/PostgreSQL type mismatch for evidence hash
+   - Root cause: `evidence.evidence.sha256` is defined as `CHAR(64)` in PostgreSQL, while the JPA entity mapped it with a generic string type that did not align with PostgreSQL's `bpchar` representation during schema validation.
+   - Fix approach: align the JPA `@Column` mapping to `char(64)` and rerun the backend validation tests.
+  - Status: FIXED / VERIFIED
+
+2. Issue 02 — Java compilation failure in notification integration test lambda capture
+   - Root cause: the lambda in `NotificationServiceIntegrationTest` captured mutable loop/assignment variables that were not effectively final.
+   - Fix approach: store the expected UUID values in final local variables and assert against those values inside the lambda.
+  - Status: FIXED / VERIFIED by full backend suite
+
+3. Issue 03 — Hibernate schema validation still expects VARCHAR for evidence.sha256
+   - Root cause: Hibernate is defaulting the mapped String field to VARCHAR even when the database column is defined as `CHAR(64)`; the fix requires an explicit JDBC type code for `CHAR`.
+   - Fix approach: annotate the field with `@JdbcTypeCode(SqlTypes.CHAR)` and validate again.
+   - Status: FIXED / VERIFIED
+
+4. Issue 04 — Test fixture uses non-existent complaint category/subcategory IDs
+   - Root cause: the complaint controller integration test used placeholder IDs instead of the UUIDs seeded in V6, so the request resolved to `null` subcategory and defaulted to `MEDIUM` severity.
+   - Fix approach: update the integration test to use the actual seeded `a100...` category and `b100...` subcategory UUIDs from the Flyway migration.
+  - Status: FIXED / VERIFIED by `ComplaintControllerIntegrationTest`
+
+5. Issue 05 — Audit JSONB payload mapping rejected complaint submission
+  - Root cause: `audit.audit_event.payload` is PostgreSQL `JSONB`, while the JPA String field was bound as a character/varchar value.
+  - Fix approach: annotate the field with `@JdbcTypeCode(SqlTypes.JSON)` so Hibernate binds it as JSON.
+  - Status: FIXED / VERIFIED by `ComplaintControllerIntegrationTest` and the full backend suite
+
+### Recommended next sequence
+
+1. Finish the remaining production hardening items: token lifecycle, route-level authorization, and real evidence upload handling.
+2. Add broader HTTP authentication coverage for protected APIs.
+3. Implement authority, assignment, routing and SLA slices according to the frozen design.
+4. Implement transparency projection and analytics only through their designated read models.
+5. Run browser regression verification and complete the final Git review/commit once all release checks are green.
 
 **End of Project Context**
-
-## V6 & V7 — Categories, Geography Data & Frontend Selection Checkpoint
-
-### Status: COMPLETED & VERIFIED
-
-1. **Database Migrations**:
-   - `V6__create_and_seed_complaint_categories.sql`: Created `complaint_category` and `complaint_subcategory` tables and seeded them with 6 main categories (ROADS, SANITATION, WATER, SAFETY, SCHOOL, FOOD) and 16 subcategories with default priorities.
-   - `V7__seed_bengaluru_wards_and_localities.sql`: Seeded Bengaluru city UUID with 6 Wards (Koramangala, Indiranagar, HSR Layout, Whitefield, Jayanagar, Malleshwaram) and 19 Localities.
-
-2. **Backend Geography & Category APIs**:
-   - `CategoryService`, `ComplaintCategoryRepository`, `ComplaintSubcategoryRepository`, and `CategoryController`.
-   - `GET /api/v1/categories`: Returns full category tree with subcategories and priorities.
-   - `GeographyService`, `WardRepository`, `LocalityRepository`, and `GeographyController`.
-   - `GET /api/v1/geography/cities/{cityId}/wards`: Returns wards for a city.
-   - `GET /api/v1/geography/wards/{wardId}/localities`: Returns localities for a ward.
-
-3. **Automated Integration Tests**:
-   - `CategoryControllerIntegrationTest`: **PASS** (Verifies 6 categories and subcategories priority).
-   - `GeographyHierarchyIntegrationTest`: **PASS** (Verifies cascade fetch of Bengaluru wards and Koramangala localities).
-
-4. **Frontend Implementation**:
-   - Developed `CategoryLocationSelector.tsx` for the reporting wizard.
-   - Implemented dynamic cascading dropdowns fetching from Geography API (Wards -> Localities).
-   - Included interactive category icon grid and priority-badged subcategories.
-
-5. **Single Source of Truth**:
-   - `docs/project-context/PROJECT_CONTEXT.md` updated as requested. All temporary plan docs and walkthroughs are archived in the repository context.
-
-## V8 to V11 — Complaint Submission Flow & Frontend Reporting Checkpoint
-
-### Status: COMPLETED & VERIFIED
-
-1. **Database Migrations**:
-   - `V8__create_complaint_tables.sql`: Created `complaint` table with fields for tracking reports.
-   - `V9__create_location_tables.sql`: Created `complaint_location` table integrating PostGIS coordinates and exposure policies.
-   - `V10__create_workflow_tables.sql`: Created `workflow` and `workflow_transition` tables for complaint lifecycle state.
-   - `V11__create_evidence_tables.sql`: Created `evidence` table for managing photo/video uploads and metadata.
-
-2. **Backend Submission APIs & Entities**:
-   - Implemented JPA entities: `Complaint`, `ComplaintLocation`, `Workflow`, `WorkflowTransition`, `Evidence`.
-   - Built `ComplaintSubmissionService` orchestrating the creation of complaints, location, workflow state, and evidence records within a single transaction.
-   - `POST /api/v1/complaints`: Accepts `ComplaintSubmissionRequest`, handles citizen association from the security context, and returns the complaint UUID.
-
-3. **Automated Integration Tests**:
-   - `ComplaintControllerIntegrationTest`: **PASS** (Verifies successful complaint submission, transactional rollback on failure, location storage, workflow state creation, and evidence linkage).
-   - Resolved Hibernate native query sequence and `geometry` type compatibility using `ST_SetSRID(ST_MakePoint(...), 4326)`.
-
-4. **Frontend Implementation**:
-   - Built `/report/details` page in Next.js capturing exact location (latitude, longitude, exact address) and evidence upload metadata.
-   - Built `/report` (Reporting Wizard) integrating the previously built `CategoryLocationSelector`.
-   - Linked Next.js frontend to `POST /api/v1/complaints` and verified successful submission flows.
-
-## V12 to V14 — Authority, Assignment, and Routing Implementation
-
-### Status: IMPLEMENTED
-
-1. **Database Migrations**:
-   - `V12__create_authority_tables.sql`: Created `authority`, `authority_department`, and `authority_user` tables.
-   - `V13__create_assignment_tables.sql`: Created `complaint_assignment` table for tracking assignments.
-   - `V14__create_routing_tables.sql`: Created `routing_rule` and `routing_decision` tables to handle automated routing logic.
-
-2. **Backend Submission APIs & Entities**:
-   - Created JPA entities and repositories for Authority, Assignment, and Routing modules.
-   - Created `RoutingEngineService` to evaluate complaints against active `RoutingRule` entries based on specificity and priority.
-   - Created `AssignmentService` to assign complaints to an `AuthorityDepartment`.
-   - Modified `ComplaintSubmissionServiceImpl` to trigger `RoutingEngineService` automatically on complaint submission.
-
-## V15 to V17 — SLA, Notification, and Audit Implementation
-
-### Status: IMPLEMENTED
-
-1. **Database Migrations**:
-   - `V15__create_sla_tables.sql`: Created `sla.sla_policy` (target resolution hours by category/severity) and `sla.complaint_sla` (per-complaint deadline tracking with pause support).
-   - `V16__create_notification_tables.sql`: Created `notification.notification` (logical message to a user) and `notification.notification_delivery` (delivery channel tracking: IN_APP, EMAIL, SMS).
-   - `V17__create_audit_tables.sql`: Created `audit.audit_event` (immutable append-only log with JSONB payload for capturing every key system action).
-
-2. **SLA Module** (`com.civictransparency.sla`):
-   - `SlaPolicy` + `ComplaintSla` entities and repositories.
-   - `SlaService.initializeSla()` — called automatically after routing; looks up the best matching policy by category + severity and sets a resolution deadline on the complaint.
-
-3. **Notification Module** (`com.civictransparency.notification`):
-   - `Notification` + `NotificationDelivery` entities and repositories.
-   - `NotificationService` — sends an IN_APP notification to the citizen (complaint routed acknowledgment) and to the assigned authority department (new assignment alert) immediately on routing.
-
-4. **Audit Module** (`com.civictransparency.audit`):
-   - `AuditEvent` entity and `AuditEventRepository`.
-   - `AuditService.log()` — uses `Propagation.REQUIRES_NEW` so audit entries are persisted even if the calling transaction rolls back, guaranteeing an immutable trail.
-   - Wired into `ComplaintSubmissionServiceImpl` (`COMPLAINT_SUBMITTED`) and `RoutingEngineService` (`COMPLAINT_ROUTED`).
-
-5. **Integration**:
-   - `RoutingEngineService` now coordinates the full post-routing lifecycle in one transaction: Assignment → SLA initialization → Notifications → Audit log.
-
-### What Remains (Next Phase)
-- **Authority Dashboard** (Next.js): Officials log in, view assigned complaints, and update status.
-- **Public Transparency Dashboard** (Next.js): Anonymized city-wide metrics for any visitor.
-- **Email/SMS delivery**: Plug a real provider (SendGrid, Twilio) into the `NotificationDelivery` pipeline.

@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
+import { saveSession } from "@/lib/auth";
 
 type Mode = "login" | "register";
 
@@ -32,6 +33,8 @@ type LoginResponse = {
   accessToken: string;
   tokenType: string;
   expiresAt: string;
+  userId: string;
+  citizenId: string;
   username: string | null;
   publicAlias: string | null;
   roles: string[];
@@ -106,12 +109,16 @@ function LoginForm() {
       }
 
       const data: LoginResponse = await response.json();
-      sessionStorage.setItem("civic.accessToken", data.accessToken);
-      sessionStorage.setItem("civic.tokenExpiresAt", data.expiresAt);
-      if (data.username) sessionStorage.setItem("civic.username", data.username);
-      if (data.publicAlias) sessionStorage.setItem("civic.publicAlias", data.publicAlias);
-      if (data.roles) sessionStorage.setItem("civic.roles", JSON.stringify(data.roles));
-      
+      saveSession({
+        accessToken: data.accessToken,
+        expiresAt: data.expiresAt,
+        userId: data.userId,
+        citizenId: data.citizenId,
+        username: data.username,
+        publicAlias: data.publicAlias,
+        roles: data.roles,
+      });
+
       router.push("/dashboard");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to sign in.");

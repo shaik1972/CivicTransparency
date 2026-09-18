@@ -1,46 +1,70 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { clearSession, getAuthHeaders, readSession, type StoredSession } from "@/lib/auth";
 
-type UserSession = {
-  publicAlias: string;
-  username: string;
-  roles: string[];
-  userId: string;
-  citizenId: string;
+type ComplaintSummary = {
+  complaintId: string;
+  complaintReference: string;
+  title: string;
+  category: string;
+  severity: string;
+  state: string;
+  city: string;
+  createdAt: string;
 };
+
+const API_BASE_URL = "http://localhost:8080";
+
+function getStoredSession(): StoredSession | null {
+  return readSession();
+}
 
 export default function DashboardPage() {
   const router = useRouter();
-  const [session, setSession] = useState<UserSession | null>(null);
-  const [loading, setLoading] = useState(true);
+  const session = useSyncExternalStore(
+    () => () => {},
+    getStoredSession,
+    () => null
+  );
+  const [complaints, setComplaints] = useState<ComplaintSummary[]>([]);
+  const [complaintsLoading, setComplaintsLoading] = useState(true);
 
   useEffect(() => {
-    const token = sessionStorage.getItem("civic.accessToken");
-    if (!token) {
+    if (!readSession()) {
       router.push("/");
+    }
+  }, [router]);
+
+  useEffect(() => {
+    if (!session?.citizenId) {
       return;
     }
 
-    const publicAlias = sessionStorage.getItem("civic.publicAlias") || "Citizen";
-    const username = sessionStorage.getItem("civic.username") || "";
-    const userId = sessionStorage.getItem("civic.userId") || "";
-    const citizenId = sessionStorage.getItem("civic.citizenId") || "";
-    const rawRoles = sessionStorage.getItem("civic.roles");
-    const roles: string[] = rawRoles ? JSON.parse(rawRoles) : ["CITIZEN"];
+    async function loadComplaints() {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/v1/complaints/mine`, {
+          headers: getAuthHeaders(),
+        });
+        if (response.ok) {
+          setComplaints(await response.json());
+        }
+      } finally {
+        setComplaintsLoading(false);
+      }
+    }
 
-    setSession({ publicAlias, username, roles, userId, citizenId });
-    setLoading(false);
-  }, [router]);
+    loadComplaints();
+  }, [session]);
 
   function handleSignOut() {
-    sessionStorage.clear();
+    clearSession();
     router.push("/");
   }
 
-  if (loading) {
+  if (!session) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-900 text-white">
         <div className="text-center">
@@ -117,10 +141,10 @@ export default function DashboardPage() {
             <div className="flex items-center justify-between">
               <span className="text-sm font-semibold text-slate-500">Reported Issues</span>
               <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-sky-50 text-sky-700 font-bold">
-                0
+                {complaints.length}
               </span>
             </div>
-            <p className="mt-4 text-2xl font-bold text-slate-900">0</p>
+            <p className="mt-4 text-2xl font-bold text-slate-900">{complaints.length}</p>
             <p className="mt-1 text-xs text-slate-500">Total complaints submitted by you</p>
           </div>
 
@@ -128,10 +152,10 @@ export default function DashboardPage() {
             <div className="flex items-center justify-between">
               <span className="text-sm font-semibold text-slate-500">In Progress</span>
               <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-50 text-amber-700 font-bold">
-                0
+                {complaints.filter((complaint) => !["RESOLVED", "REJECTED", "CLOSED"].includes(complaint.state)).length}
               </span>
             </div>
-            <p className="mt-4 text-2xl font-bold text-slate-900">0</p>
+            <p className="mt-4 text-2xl font-bold text-slate-900">{complaints.filter((complaint) => !["RESOLVED", "REJECTED", "CLOSED"].includes(complaint.state)).length}</p>
             <p className="mt-1 text-xs text-slate-500">Assigned to municipal authorities</p>
           </div>
 
@@ -139,11 +163,33 @@ export default function DashboardPage() {
             <div className="flex items-center justify-between">
               <span className="text-sm font-semibold text-slate-500">Resolved</span>
               <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700 font-bold">
-                0
+                {complaints.filter((complaint) => ["RESOLVED", "CLOSED"].includes(complaint.state)).length}
               </span>
             </div>
-            <p className="mt-4 text-2xl font-bold text-slate-900">0</p>
+            <p className="mt-4 text-2xl font-bold text-slate-900">{complaints.filter((complaint) => ["RESOLVED", "CLOSED"].includes(complaint.state)).length}</p>
             <p className="mt-1 text-xs text-slate-500">Successfully closed complaints</p>
+          </div>
+        </section>
+
+        <section className="mt-10">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold text-slate-900">Your Reports</h3>
+            {complaintsLoading && <span className="text-xs text-slate-500">Loading...</span>}
+          </div>
+          <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+            {complaints.length === 0 && !complaintsLoading ? (
+              <p className="p-6 text-sm text-slate-500">No complaints submitted yet.</p>
+            ) : (
+              complaints.slice(0, 5).map((complaint) => (
+                <div key={complaint.complaintId} className="flex flex-col gap-2 border-b border-slate-100 p-5 last:border-b-0 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900">{complaint.title}</p>
+                    <p className="mt-1 text-xs text-slate-500">{complaint.complaintReference} · {complaint.category} · {complaint.city}</p>
+                  </div>
+                  <span className="w-fit rounded-full bg-sky-100 px-3 py-1 text-xs font-semibold text-sky-800">{complaint.state}</span>
+                </div>
+              ))
+            )}
           </div>
         </section>
 

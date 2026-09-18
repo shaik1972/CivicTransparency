@@ -7,4 +7,6 @@ import java.util.Optional;
 
 public interface ComplaintRepository extends JpaRepository<Complaint, UUID> {
     Optional<Complaint> findByComplaintReference(String reference);
+
+    java.util.List<Complaint> findByCitizenCitizenIdOrderByCreatedAtDesc(UUID citizenId);
 }

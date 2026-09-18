@@ -30,12 +30,18 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Transactional
 class AuthenticationControllerIntegrationTest {
 
-    @Autowired private MockMvc mockMvc;
-    @Autowired private UserAccountRepository userAccountRepository;
-    @Autowired private RoleRepository roleRepository;
-    @Autowired private UserRoleRepository userRoleRepository;
-    @Autowired private CitizenProfileRepository citizenProfileRepository;
-    @Autowired private PasswordHashingService passwordHashingService;
+    @Autowired
+    private MockMvc mockMvc;
+    @Autowired
+    private UserAccountRepository userAccountRepository;
+    @Autowired
+    private RoleRepository roleRepository;
+    @Autowired
+    private UserRoleRepository userRoleRepository;
+    @Autowired
+    private CitizenProfileRepository citizenProfileRepository;
+    @Autowired
+    private PasswordHashingService passwordHashingService;
 
     @Test
     void shouldLoginWithEmailAndIssueBearerToken() throws Exception {
@@ -43,12 +49,13 @@ class AuthenticationControllerIntegrationTest {
         UserAccount user = createCitizen(email, "loginuser", "TestPassword123!");
 
         mockMvc.perform(post("/api/v1/auth/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"identifier":"%s","password":"TestPassword123!"}
-                                """.formatted(email)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {"identifier":"%s","password":"TestPassword123!"}
+                        """.formatted(email)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.accessToken").isNotEmpty())
+                .andExpect(jsonPath("$.refreshToken").isNotEmpty())
                 .andExpect(jsonPath("$.tokenType").value("Bearer"))
                 .andExpect(jsonPath("$.userId").value(user.getUserId().toString()))
                 .andExpect(jsonPath("$.publicAlias").value("Login Test Citizen"))
@@ -62,11 +69,38 @@ class AuthenticationControllerIntegrationTest {
         createCitizen("username." + UUID.randomUUID() + "@example.com", "usernameuser", "TestPassword123!");
 
         mockMvc.perform(post("/api/v1/auth/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{" +
-                                "\"identifier\":\"usernameuser\",\"password\":\"TestPassword123!\"}"))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{" +
+                        "\"identifier\":\"usernameuser\",\"password\":\"TestPassword123!\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.username").value("usernameuser"));
+    }
+
+    @Test
+    void shouldRefreshAccessTokenWithValidRefreshToken() throws Exception {
+        String email = "refresh." + UUID.randomUUID() + "@example.com";
+        UserAccount user = createCitizen(email, "refreshuser", "TestPassword123!");
+
+        String loginBody = mockMvc.perform(post("/api/v1/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {"identifier":"%s","password":"TestPassword123!"}
+                        """.formatted(email)))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        String refreshToken = com.jayway.jsonpath.JsonPath.read(loginBody, "$.refreshToken");
+
+        mockMvc.perform(post("/api/v1/auth/refresh")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {"refreshToken":"%s"}
+                        """.formatted(refreshToken)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.userId").value(user.getUserId().toString()))
+                .andExpect(jsonPath("$.accessToken").isNotEmpty());
     }
 
     @Test
@@ -75,10 +109,10 @@ class AuthenticationControllerIntegrationTest {
         createCitizen(email, "incorrectuser", "TestPassword123!");
 
         mockMvc.perform(post("/api/v1/auth/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"identifier":"%s","password":"incorrect"}
-                                """.formatted(email)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {"identifier":"%s","password":"incorrect"}
+                        """.formatted(email)))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("INVALID_CREDENTIALS"));
     }
