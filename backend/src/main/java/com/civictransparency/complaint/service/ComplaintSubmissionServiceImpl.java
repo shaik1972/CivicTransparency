@@ -24,7 +24,9 @@ import com.civictransparency.audit.service.AuditService;
 import com.civictransparency.routing.service.RoutingEngineService;
 import com.civictransparency.workflow.entity.ComplaintState;
 import com.civictransparency.workflow.entity.Workflow;
+import com.civictransparency.workflow.entity.WorkflowTransition;
 import com.civictransparency.workflow.repository.WorkflowRepository;
+import com.civictransparency.workflow.repository.WorkflowTransitionRepository;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.GeometryFactory;
 import org.locationtech.jts.geom.Point;
@@ -40,6 +42,7 @@ public class ComplaintSubmissionServiceImpl implements ComplaintSubmissionServic
         private final ComplaintRepository complaintRepository;
         private final ComplaintLocationRepository locationRepository;
         private final WorkflowRepository workflowRepository;
+        private final WorkflowTransitionRepository workflowTransitionRepository;
         private final EvidenceRepository evidenceRepository;
         private final CitizenProfileRepository citizenRepository;
         private final ComplaintCategoryRepository categoryRepository;
@@ -54,6 +57,7 @@ public class ComplaintSubmissionServiceImpl implements ComplaintSubmissionServic
                         ComplaintRepository complaintRepository,
                         ComplaintLocationRepository locationRepository,
                         WorkflowRepository workflowRepository,
+                        WorkflowTransitionRepository workflowTransitionRepository,
                         EvidenceRepository evidenceRepository,
                         CitizenProfileRepository citizenRepository,
                         ComplaintCategoryRepository categoryRepository,
@@ -65,6 +69,7 @@ public class ComplaintSubmissionServiceImpl implements ComplaintSubmissionServic
                 this.complaintRepository = complaintRepository;
                 this.locationRepository = locationRepository;
                 this.workflowRepository = workflowRepository;
+                this.workflowTransitionRepository = workflowTransitionRepository;
                 this.evidenceRepository = evidenceRepository;
                 this.citizenRepository = citizenRepository;
                 this.categoryRepository = categoryRepository;
@@ -145,6 +150,14 @@ public class ComplaintSubmissionServiceImpl implements ComplaintSubmissionServic
                                 complaint,
                                 ComplaintState.SUBMITTED);
                 workflowRepository.save(workflow);
+
+                workflowTransitionRepository.save(new WorkflowTransition(
+                                UUID.randomUUID(),
+                                workflow,
+                                null,
+                                ComplaintState.SUBMITTED,
+                                "Complaint submitted by citizen",
+                                null));
 
                 if (request.evidence() != null && !request.evidence().isEmpty()) {
                         for (ComplaintSubmissionRequest.EvidenceSubmission evReq : request.evidence()) {

@@ -52,6 +52,9 @@ class ComplaintControllerIntegrationTest {
     private WorkflowRepository workflowRepository;
 
     @Autowired
+    private com.civictransparency.workflow.repository.WorkflowTransitionRepository workflowTransitionRepository;
+
+    @Autowired
     private EvidenceRepository evidenceRepository;
 
     @Autowired
@@ -125,6 +128,12 @@ class ComplaintControllerIntegrationTest {
         var wfOpt = workflowRepository.findByComplaintComplaintId(complaintId);
         assertTrue(wfOpt.isPresent());
         assertEquals(ComplaintState.SUBMITTED, wfOpt.get().getCurrentState());
+
+        var transitions = workflowTransitionRepository
+                .findByWorkflowWorkflowIdOrderByCreatedAtAsc(wfOpt.get().getWorkflowId());
+        assertEquals(1, transitions.size());
+        assertEquals(ComplaintState.SUBMITTED, transitions.get(0).getToState());
+        assertNull(transitions.get(0).getFromState());
 
         // Verify Evidence
         var evList = evidenceRepository.findByComplaintComplaintIdOrderByCreatedAtAsc(complaintId);
