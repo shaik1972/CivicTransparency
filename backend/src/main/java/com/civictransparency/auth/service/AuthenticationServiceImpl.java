@@ -5,6 +5,7 @@ import com.civictransparency.auth.dto.LoginResponse;
 import com.civictransparency.auth.exception.InvalidCredentialsException;
 import com.civictransparency.citizen.entity.CitizenProfile;
 import com.civictransparency.citizen.repository.CitizenProfileRepository;
+import com.civictransparency.authority.repository.AuthorityUserRepository;
 import com.civictransparency.identity.entity.UserAccount;
 import com.civictransparency.identity.repository.UserAccountRepository;
 import com.civictransparency.identity.repository.UserRoleRepository;
@@ -28,6 +29,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     private final UserAccountRepository userAccountRepository;
     private final UserRoleRepository userRoleRepository;
     private final CitizenProfileRepository citizenProfileRepository;
+    private final AuthorityUserRepository authorityUserRepository;
     private final PasswordHashingService passwordHashingService;
     private final AccessTokenService accessTokenService;
     private final long tokenTtlMinutes;
@@ -37,6 +39,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
             UserAccountRepository userAccountRepository,
             UserRoleRepository userRoleRepository,
             CitizenProfileRepository citizenProfileRepository,
+            AuthorityUserRepository authorityUserRepository,
             PasswordHashingService passwordHashingService,
             AccessTokenService accessTokenService,
             @Value("${civic.auth.token-ttl-minutes}") long tokenTtlMinutes,
@@ -44,6 +47,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         this.userAccountRepository = userAccountRepository;
         this.userRoleRepository = userRoleRepository;
         this.citizenProfileRepository = citizenProfileRepository;
+        this.authorityUserRepository = authorityUserRepository;
         this.passwordHashingService = passwordHashingService;
         this.accessTokenService = accessTokenService;
         this.tokenTtlMinutes = tokenTtlMinutes;
@@ -61,13 +65,19 @@ public class AuthenticationServiceImpl implements AuthenticationService {
             throw new InvalidCredentialsException();
         }
 
-        CitizenProfile profile = citizenProfileRepository.findByUserUserId(user.getUserId())
-                .orElseThrow(InvalidCredentialsException::new);
         List<String> roles = userRoleRepository.findByIdUserId(user.getUserId())
                 .stream()
                 .map(userRole -> userRole.getRole().getCode())
                 .sorted()
                 .toList();
+        CitizenProfile profile = citizenProfileRepository.findByUserUserId(user.getUserId()).orElse(null);
+        boolean systemAdmin = roles.contains("SYSTEM_ADMIN");
+        boolean authorityUser = roles.stream()
+                .anyMatch(role -> role.equals("AUTHORITY_ADMIN") || role.equals("AUTHORITY_OFFICER"))
+                && isActiveAuthorityUser(user.getUserId());
+        if (profile == null && !systemAdmin && !authorityUser) {
+            throw new InvalidCredentialsException();
+        }
         OffsetDateTime expiresAt = OffsetDateTime.now().plusMinutes(tokenTtlMinutes);
 
         user.setLastLoginAt(OffsetDateTime.now());
@@ -82,21 +92,38 @@ public class AuthenticationServiceImpl implements AuthenticationService {
                 "Bearer",
                 expiresAt,
                 user.getUserId(),
-                profile.getCitizenId(),
+                profile != null ? profile.getCitizenId() : null,
                 user.getUsername(),
-                profile.getPublicAlias(),
+                profile != null ? profile.getPublicAlias() : null,
                 roles);
     }
 
     @Override
     public LoginResponse refresh(String refreshToken) {
                 UUID userId = accessTokenService.verifyRefresh(refreshToken);
-        List<String> roles = accessTokenService.getRoles(refreshToken);
+        List<String> tokenRoles = accessTokenService.getRoles(refreshToken);
 
         UserAccount user = userAccountRepository.findById(userId)
                 .orElseThrow(InvalidCredentialsException::new);
-        CitizenProfile profile = citizenProfileRepository.findByUserUserId(userId)
-                .orElseThrow(InvalidCredentialsException::new);
+        if (!ACTIVE_STATUS.equals(user.getStatus())) {
+            throw new InvalidCredentialsException();
+        }
+        List<String> roles = userRoleRepository.findByIdUserId(userId)
+                .stream()
+                .map(userRole -> userRole.getRole().getCode())
+                .sorted()
+                .toList();
+        if (roles.isEmpty() || !roles.containsAll(tokenRoles)) {
+            throw new InvalidCredentialsException();
+        }
+        CitizenProfile profile = citizenProfileRepository.findByUserUserId(userId).orElse(null);
+        boolean systemAdmin = roles.contains("SYSTEM_ADMIN");
+        boolean authorityUser = roles.stream()
+                .anyMatch(role -> role.equals("AUTHORITY_ADMIN") || role.equals("AUTHORITY_OFFICER"))
+                && isActiveAuthorityUser(userId);
+        if (profile == null && !systemAdmin && !authorityUser) {
+            throw new InvalidCredentialsException();
+        }
 
         OffsetDateTime accessExpiresAt = OffsetDateTime.now().plusMinutes(tokenTtlMinutes);
         OffsetDateTime refreshExpiresAt = OffsetDateTime.now().plusMinutes(refreshTokenTtlMinutes);
@@ -109,9 +136,9 @@ public class AuthenticationServiceImpl implements AuthenticationService {
                 "Bearer",
                 accessExpiresAt,
                 user.getUserId(),
-                profile.getCitizenId(),
+                profile != null ? profile.getCitizenId() : null,
                 user.getUsername(),
-                profile.getPublicAlias(),
+                profile != null ? profile.getPublicAlias() : null,
                 roles);
     }
 
@@ -120,5 +147,13 @@ public class AuthenticationServiceImpl implements AuthenticationService {
             return userAccountRepository.findByEmail(identifier.toLowerCase(Locale.ROOT));
         }
         return userAccountRepository.findByUsername(identifier);
+    }
+
+    private boolean isActiveAuthorityUser(UUID userId) {
+        return authorityUserRepository.findByUserAccount_UserId(userId)
+                .map(authorityUser -> authorityUser.getDepartment())
+                .filter(department -> "ACTIVE".equals(department.getStatus()))
+                .map(department -> "ACTIVE".equals(department.getAuthority().getStatus()))
+                .orElse(false);
     }
 }

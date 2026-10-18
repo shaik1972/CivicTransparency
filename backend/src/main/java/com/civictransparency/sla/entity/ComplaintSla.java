@@ -3,6 +3,7 @@ package com.civictransparency.sla.entity;
 import com.civictransparency.complaint.entity.Complaint;
 import jakarta.persistence.*;
 import java.time.OffsetDateTime;
+import java.time.Duration;
 import java.util.UUID;
 
 @Entity
@@ -55,12 +56,32 @@ public class ComplaintSla {
     }
 
     public void pause(String reason) {
+        if (!"ACTIVE".equals(status) || Boolean.TRUE.equals(isPaused)) {
+            throw new IllegalStateException("Only an active SLA can be paused");
+        }
         this.isPaused = true;
         this.pausedAt = OffsetDateTime.now();
         this.pausedReason = reason;
+        this.status = "PAUSED";
+    }
+
+    public void resume() {
+        if (!Boolean.TRUE.equals(isPaused) || pausedAt == null || !"PAUSED".equals(status)) {
+            throw new IllegalStateException("Only a paused SLA can be resumed");
+        }
+        OffsetDateTime now = OffsetDateTime.now();
+        this.deadline = deadline.plus(Duration.between(pausedAt, now));
+        this.isPaused = false;
+        this.pausedAt = null;
+        this.pausedReason = null;
+        this.status = "ACTIVE";
     }
 
     public void resolve() {
+        if ("RESOLVED".equals(status)) {
+            throw new IllegalStateException("SLA is already resolved");
+        }
+        this.isPaused = false;
         this.resolvedAt = OffsetDateTime.now();
         this.status = "RESOLVED";
     }
@@ -72,4 +93,6 @@ public class ComplaintSla {
     public Boolean getIsPaused() { return isPaused; }
     public String getStatus() { return status; }
     public OffsetDateTime getResolvedAt() { return resolvedAt; }
+    public OffsetDateTime getPausedAt() { return pausedAt; }
+    public String getPausedReason() { return pausedReason; }
 }

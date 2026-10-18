@@ -128,6 +128,10 @@ public class RoutingRule {
         return isActive;
     }
 
+    public void setIsActive(Boolean isActive) {
+        this.isActive = isActive;
+    }
+
     public OffsetDateTime getEffectiveFrom() {
         return effectiveFrom;
     }

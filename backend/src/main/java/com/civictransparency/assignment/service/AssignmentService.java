@@ -4,9 +4,11 @@ import com.civictransparency.assignment.entity.ComplaintAssignment;
 import com.civictransparency.assignment.repository.ComplaintAssignmentRepository;
 import com.civictransparency.authority.entity.AuthorityDepartment;
 import com.civictransparency.complaint.entity.Complaint;
+import com.civictransparency.identity.entity.UserAccount;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -20,18 +22,30 @@ public class AssignmentService {
 
     @Transactional
     public void assignComplaint(Complaint complaint, AuthorityDepartment department) {
-        // Mark previous assignment as unassigned if exists
-        assignmentRepository.findByComplaint_ComplaintIdAndUnassignedAtIsNull(complaint.getComplaintId())
-            .ifPresent(ComplaintAssignment::markUnassigned);
+        assignComplaint(complaint, department, "AUTOMATED_ROUTING", null);
+    }
 
-        // Create new assignment
+    @Transactional
+    public void assignComplaint(Complaint complaint, AuthorityDepartment department, String reason,
+            UserAccount assignedBy) {
+        assignmentRepository.findByComplaint_ComplaintIdAndUnassignedAtIsNull(complaint.getComplaintId())
+                .ifPresent(assignment -> {
+                    assignment.markUnassigned();
+                    assignmentRepository.save(assignment);
+                });
+
         ComplaintAssignment newAssignment = new ComplaintAssignment(
             UUID.randomUUID(),
             complaint,
             department,
-            "AUTOMATED_ROUTING",
-            null
+            reason,
+            assignedBy
         );
         assignmentRepository.save(newAssignment);
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<ComplaintAssignment> getCurrentAssignment(UUID complaintId) {
+        return assignmentRepository.findByComplaint_ComplaintIdAndUnassignedAtIsNull(complaintId);
     }
 }

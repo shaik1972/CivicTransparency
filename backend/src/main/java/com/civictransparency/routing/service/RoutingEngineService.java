@@ -9,6 +9,7 @@ import com.civictransparency.routing.entity.RoutingRule;
 import com.civictransparency.routing.repository.RoutingDecisionRepository;
 import com.civictransparency.routing.repository.RoutingRuleRepository;
 import com.civictransparency.sla.service.SlaService;
+import com.civictransparency.workflow.service.WorkflowService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,19 +26,22 @@ public class RoutingEngineService {
     private final SlaService slaService;
     private final NotificationService notificationService;
     private final AuditService auditService;
+    private final WorkflowService workflowService;
 
     public RoutingEngineService(RoutingRuleRepository routingRuleRepository,
             RoutingDecisionRepository routingDecisionRepository,
             AssignmentService assignmentService,
             SlaService slaService,
             NotificationService notificationService,
-            AuditService auditService) {
+            AuditService auditService,
+            WorkflowService workflowService) {
         this.routingRuleRepository = routingRuleRepository;
         this.routingDecisionRepository = routingDecisionRepository;
         this.assignmentService = assignmentService;
         this.slaService = slaService;
         this.notificationService = notificationService;
         this.auditService = auditService;
+        this.workflowService = workflowService;
     }
 
     @Transactional
@@ -63,7 +67,8 @@ public class RoutingEngineService {
 
         RoutingRule bestRule = rules.stream()
                 .max(Comparator.comparingInt((RoutingRule rule) -> getSpecificityScore(rule))
-                        .thenComparingInt(RoutingRule::getPriority))
+                        .thenComparingInt(rule -> rule.getPriority())
+                        .thenComparing(rule -> rule.getRuleId()))
                 .orElseThrow();
 
         int specificityScore = getSpecificityScore(bestRule);
@@ -77,7 +82,9 @@ public class RoutingEngineService {
 
         routingDecisionRepository.save(decision);
 
+        workflowService.markRouted(complaint);
         assignmentService.assignComplaint(complaint, bestRule.getDepartment());
+        workflowService.markAssigned(complaint, "AUTOMATED_ROUTING", null);
 
         slaService.initializeSla(complaint);
 

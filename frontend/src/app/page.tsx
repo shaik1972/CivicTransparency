@@ -1,4 +1,5 @@
 import AuthPanel from "@/components/auth/AuthPanel";
+import Link from "next/link";
 
 export default function Home() {
   return (
@@ -50,7 +51,12 @@ export default function Home() {
 
           <div className="relative z-10 mt-16 flex flex-col gap-3 border-t border-white/10 pt-6 text-sm text-slate-400 sm:flex-row sm:items-center sm:justify-between">
             <span>Citizen Accountability Platform</span>
-            <span>Your identity and sensitive information are protected.</span>
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+              <Link href="/authority/login" className="font-medium text-sky-300 hover:text-white">
+                Authority staff sign in
+              </Link>
+              <span>Your identity and sensitive information are protected.</span>
+            </div>
           </div>
         </div>
 

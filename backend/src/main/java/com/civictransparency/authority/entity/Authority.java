@@ -47,4 +47,6 @@ public class Authority {
     public State getState() { return state; }
     public City getCity() { return city; }
     public String getStatus() { return status; }
+
+    public void setStatus(String status) { this.status = status; }
 }

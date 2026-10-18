@@ -30,17 +30,26 @@ public class SlaPolicy {
     @Column(name = "is_active", nullable = false)
     private Boolean isActive;
 
+    @Column(name = "hold_pauses_sla", nullable = false)
+    private Boolean holdPausesSla;
+
     protected SlaPolicy() {
     }
 
     public SlaPolicy(UUID policyId, ComplaintCategory category, ComplaintSubcategory subcategory,
             String severity, Integer targetHours, Boolean isActive) {
+        this(policyId, category, subcategory, severity, targetHours, isActive, false);
+    }
+
+    public SlaPolicy(UUID policyId, ComplaintCategory category, ComplaintSubcategory subcategory,
+            String severity, Integer targetHours, Boolean isActive, Boolean holdPausesSla) {
         this.policyId = policyId;
         this.category = category;
         this.subcategory = subcategory;
         this.severity = severity;
         this.targetHours = targetHours;
         this.isActive = isActive;
+        this.holdPausesSla = holdPausesSla;
     }
 
     public UUID getPolicyId() {
@@ -65,5 +74,13 @@ public class SlaPolicy {
 
     public Boolean getIsActive() {
         return isActive;
+    }
+
+    public void setIsActive(Boolean isActive) {
+        this.isActive = isActive;
+    }
+
+    public Boolean getHoldPausesSla() {
+        return holdPausesSla;
     }
 }

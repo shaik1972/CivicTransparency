@@ -4,7 +4,7 @@
 >
 > **Authority:** This is a continuity document, not the architectural source of truth. The frozen documents under `docs/architecture/` and `docs/design/` remain authoritative.
 >
-> **Last updated:** 2026-09-18
+> **Last updated:** 2026-10-18
 
 ## 1. Project Overview
 
@@ -245,7 +245,7 @@ Do not modify an already-applied Flyway migration to change the schema. Create a
 
 ## 9. Migration Progress
 
-The repository has applied migrations through V17. The historical roadmap in earlier versions of this document used a different numbering scheme; the migration files below are the current source of truth.
+V18 adds authority roles and SLA hold behavior. The full backend test suite passed on 2026-10-18, including Flyway startup and Hibernate schema validation. The historical roadmap in earlier versions of this document used a different numbering scheme; the migration files below are the current source of truth.
 
 ```text
 V1   Application schemas                  COMPLETE
@@ -265,9 +265,10 @@ V14  Routing tables                         COMPLETE
 V15  SLA tables                             COMPLETE
 V16  Notification tables                    COMPLETE
 V17  Audit tables                           COMPLETE
+V18  Authority roles + SLA hold behavior    IMPLEMENTED / VALIDATED BY BACKEND TESTS
 ```
 
-V14 is **routing** in the implemented migration history, not administration. Administration, transparency, analytics, and moderation remain future slices. The `administration`, `transparency`, `analytics`, and `moderation` schemas were created by V1, but their domain migrations and application workflows have not yet been implemented.
+V14 is **routing** in the implemented migration history, not administration. Transparency, analytics, and moderation remain future slices. The `administration`, `transparency`, `analytics`, and `moderation` schemas were created by V1, but those domain migrations and workflows have not yet been implemented. The authority/routing/SLA configuration APIs described below live in the `admin` application package and use the existing authority, routing, and SLA schemas.
 
 ## 10. Current Implementation Status
 
@@ -278,32 +279,51 @@ Completed backend foundation:
 - Authority, assignment, and routing domain entities, repositories, and services.
 - SLA, notification, and audit domain entities, repositories, and services.
 - Initial workflow transition recording when a complaint is submitted.
+- Authority staff authentication, with roles read from signed access-token claims.
+- `SYSTEM_ADMIN`-protected configuration APIs to create/list authorities, departments, authority users, routing rules, and SLA policies; status/activation updates are available for authorities, departments, rules, and policies.
+- System administration UI at `/admin` provisions authorities, departments, authority user accounts, and routing rules; the initial `SYSTEM_ADMIN` still requires secure out-of-band bootstrap.
+- Dedicated authority sign-in at `/authority/login` uses the existing role-aware login endpoint; authority accounts are provisioned by `SYSTEM_ADMIN`, never public self-registration.
+- `AUTHORITY_ADMIN` and `AUTHORITY_OFFICER` complaint operations, scoped to the staff member's active department; `SYSTEM_ADMIN` can configure and cross-department reassign.
+- Authority portal queue lists only currently assigned complaints for the signed-in staff member's active department; staff can update lifecycle status with a required reason.
+- Citizens can view current status and transition history only for their own complaints.
+- Optional department assignment emails route by department code and contain only the complaint reference and portal link; disabled by default.
+- Workflow transitions with a validated lifecycle, audit events, actor attribution, and transition history.
+- Assignment/reassignment history, with the prior active assignment closed atomically when a new assignment is created.
+- SLA pause/resume/resolve behavior; ON_HOLD pauses only when the matched policy enables it, and resume extends the deadline by the paused duration.
 
-Completed V12-V17 hardening:
+Completed routing/SLA behavior:
 - Routing filters rules by complaint severity.
-- Routing selects the most specific matching rule, using priority as a tie-breaker.
+- Routing selects the most specific matching rule, then priority, then a stable rule identifier; the destination authority's state/city scope is also enforced.
 - Unresolved routing creates an audit event and still attempts SLA initialization.
-- SLA initialization is idempotent and policy matching prefers a subcategory-specific policy.
+- SLA initialization is idempotent and policy matching returns the most specific active policy, preferring subcategory-specific over category-wide policies.
 - Routing rules and SLA policies have application-level constructors for configuration and tests.
 
-Validation completed on 2026-09-18:
+Previously completed validation on 2026-09-18 (before the workflow changes below):
 - Backend `gradlew build` passed.
 - Frontend `npm run lint` passed.
 - Frontend `npm run build` passed.
 - Complaint and notification integration tests passed.
 
+Current workflow and authority portal verification:
+- Added `WorkflowOperationsIntegrationTest` covering management authorization, staff login, specificity-based routing, assignment history/reassignment, workflow authorization/transitions, and SLA pause/resume/resolve.
+- Added department-isolated queue and citizen-owned complaint status/history coverage.
+- Added department email notifier tests for recipient selection and minimal email content.
+- The full backend test suite, including V18 migration/schema validation, passed on 2026-10-18.
+- Frontend lint and production build passed on 2026-10-18 with the authority login, system-admin setup, authority portal, and citizen status timeline.
+- Full browser regression and actual SMTP capture testing remain pending.
+- Initial `SYSTEM_ADMIN` assignment is intentionally an out-of-band secure bootstrap operation; no public endpoint can grant system-administrator privileges.
+
 ## 11. Pending Work Slices
 
-1. Add secured management APIs and configuration workflows for authorities, departments, authority users, routing rules, and SLA policies.
-2. Complete complaint operations for manual assignment, workflow state transitions, SLA pause/resume/resolve, and reassignment history.
+1. Provision the first `SYSTEM_ADMIN` account/role through the approved secure bootstrap process and configure authority users, departments, and routing rules.
+2. Complete browser regression using citizen and authority accounts; complete local SMTP capture testing.
 3. Complete notification operations for inbox listing, read state, delivery retries, and delivery status updates.
 4. Add audit query APIs and enforce append-only behavior at the application and database boundaries.
 5. Implement moderation tables and workflows for evidence/media review.
 6. Implement the transparency projection and public complaint/dashboard APIs.
 7. Implement analytics projections and complaint metrics.
-8. Connect the frontend dashboard, report details, authority operations, notifications, and status history to backend APIs.
-9. Add matching-rule integration coverage that proves V12-V16 records are created during a routed complaint flow.
-10. Update deployment, observability, privacy, authorization, and operational documentation for production use.
+8. Complete broader production security/token-lifecycle verification.
+9. Update deployment, observability, privacy, and operational documentation for production use.
 
 The exact boundaries may change only when a genuine dependency requires it. Avoid artificial micro-migrations.
 
@@ -2105,15 +2125,22 @@ Current verification result on 15-Sep-2026:
 * The evidence `sha256` PostgreSQL `CHAR(64)` mapping mismatch is fixed with an explicit Hibernate `CHAR` JDBC type.
 * Frontend lint and the Next.js production build pass after the authenticated identity handoff, complaint dashboard, and route Suspense fixes. Full browser regression verification remains pending.
 
-The current `application.properties` also contains local datasource credentials and fallback cryptographic configuration. These values must be reviewed and externalized before any production use or repository sharing; no secret values are recorded here.
+Local development secrets belong only in the ignored `backend/application-local.properties` file or a secret manager. Do not stage or commit local secrets. Production must use managed secrets rather than local development values.
 
-Frontend linting has previously passed with `npm run lint`. A fresh full backend test and frontend lint run should be performed after any subsequent implementation changes and before the next milestone commit.
+## Check-in readiness — 2026-10-18
+
+The current implementation has passed the full backend test suite, frontend lint, frontend production build, and `git diff --check`. The main functional loop is implemented: citizens submit and track their complaints; system administrators configure authorities, departments, staff accounts, and routing; department staff review their assigned queue and record status transitions; optional department email is disabled unless explicitly configured.
+
+Before a manual end-to-end smoke test, provision the first `SYSTEM_ADMIN` account securely, configure at least one active authority/department/staff user and a matching routing rule, then test with both a citizen and authority account. Email delivery additionally requires a local SMTP capture service and department-recipient configuration. These are operational/manual verification items, not missing login or portal screens.
+
+No commit has been created. Review the complete worktree before staging because it contains multiple modified and untracked files; ensure ignored local secrets remain untracked.
 
 ### Authoritative current position
 
 ```text
 Architecture and detailed design                 COMPLETE / FROZEN
-Database migrations V1-V11                       IMPLEMENTED
+Database migrations V1-V17                       PREVIOUSLY APPLIED / VERIFIED
+Database migration V18                            CREATED; VALIDATED BY BACKEND TEST SUITE (2026-10-18)
 Identity/citizen registration                     IMPLEMENTED and verified
 Authentication/login                              IMPLEMENTED and integration-tested
 Category/geography selection                      IMPLEMENTED and integration-tested
@@ -2121,14 +2148,23 @@ Complaint submission foundation                   IMPLEMENTED and integration-te
 Workflow initialization                           IMPLEMENTED for initial SUBMITTED state
 Location/evidence metadata persistence            IMPLEMENTED
 Public transparency projection                    NOT STARTED
-Analytics and administration                      NOT STARTED
-Authority routing, assignment and SLA             NOT STARTED
+Analytics and general administration              NOT STARTED (workflow configuration APIs exist)
+Authority/routing/SLA configuration APIs           IMPLEMENTED; BACKEND TESTS GREEN
+Automatic routing and assignment                  IMPLEMENTED; BACKEND TESTS GREEN
+Manual assignment/reassignment history            IMPLEMENTED; BACKEND TESTS GREEN
+Workflow transitions and authority scope          IMPLEMENTED; BACKEND TESTS GREEN
+SLA pause/resume/resolve                           IMPLEMENTED; BACKEND TESTS GREEN
+Authority assigned-complaint queue UI/API         IMPLEMENTED; DEPARTMENT-SCOPED
+Authority staff sign-in and admin provisioning UI  IMPLEMENTED; FIRST SYSTEM_ADMIN BOOTSTRAP REQUIRED
+Citizen complaint status/history                  IMPLEMENTED; OWNER-SCOPED
+Optional department assignment email              IMPLEMENTED; DISABLED BY DEFAULT
 Real media upload/moderation pipeline              NOT STARTED
 Production authorization/token lifecycle           PARTIAL (complaint APIs validate signed bearer tokens)
-Full backend verification                          GREEN (`backend\\gradlew.bat test --no-daemon`)
+Current backend test suite                         GREEN (2026-10-18)
 Frontend lint verification                         GREEN (`npm run lint`)
 Frontend production build verification            GREEN (`npm run build`)
-Full browser regression verification               PENDING (manual browser check not yet run)
+Full browser regression verification               PENDING (requires bootstrapped test authority and citizen)
+Live SMTP capture verification                      PENDING (optional email disabled by default)
 ```
 
 ### Active issue tracker
@@ -2160,10 +2196,11 @@ Full browser regression verification               PENDING (manual browser check
 
 ### Recommended next sequence
 
-1. Finish the remaining production hardening items: token lifecycle, route-level authorization, and real evidence upload handling.
-2. Add broader HTTP authentication coverage for protected APIs.
-3. Implement authority, assignment, routing and SLA slices according to the frozen design.
-4. Implement transparency projection and analytics only through their designated read models.
-5. Run browser regression verification and complete the final Git review/commit once all release checks are green.
+1. Establish the first `SYSTEM_ADMIN` account through the secure bootstrap process, then configure active authority users, departments, and routing rules.
+2. Complete browser end-to-end regression using citizen and authority accounts; verify department-isolated queues and citizen-owned status timelines.
+3. Configure a local SMTP capture service and department recipient map to verify optional assignment email delivery.
+4. Complete the remaining production hardening items: token lifecycle and real evidence upload/moderation.
+5. Implement transparency projection and analytics only through their designated read models.
+6. Review the complete worktree, verify no local secrets are staged, then stage and commit the intended changes. Browser and SMTP manual checks remain pre-release verification items.
 
 **End of Project Context**

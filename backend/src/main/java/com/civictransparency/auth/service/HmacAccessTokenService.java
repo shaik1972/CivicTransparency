@@ -61,6 +61,15 @@ public class HmacAccessTokenService implements AccessTokenService {
     }
 
     @Override
+    public List<String> getAccessRoles(String token) {
+        try {
+            return getClaims(token, "access").roles();
+        } catch (Exception ex) {
+            throw new InvalidAccessTokenException();
+        }
+    }
+
+    @Override
     public List<String> getRoles(String token) {
         try {
             return getClaims(token, "refresh").roles();

@@ -9,6 +9,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.OffsetDateTime;
 
@@ -94,6 +95,21 @@ public class GlobalExceptionHandler {
                 return ResponseEntity
                                 .status(HttpStatus.CONFLICT)
                                 .body(response);
+        }
+
+        @ExceptionHandler(ResponseStatusException.class)
+        public ResponseEntity<ApiErrorResponse> handleExpectedRequestFailure(
+                        ResponseStatusException ex,
+                        HttpServletRequest request) {
+
+                ApiErrorResponse response = new ApiErrorResponse(
+                                OffsetDateTime.now(),
+                                ex.getStatusCode().value(),
+                                "REQUEST_REJECTED",
+                                ex.getReason() == null ? "The request could not be completed." : ex.getReason(),
+                                request.getRequestURI());
+
+                return ResponseEntity.status(ex.getStatusCode()).body(response);
         }
 
         @ExceptionHandler(Exception.class)

@@ -6,6 +6,37 @@ export type StoredSession = {
   citizenId: string;
 };
 
+let cachedSessionKey: string | null = null;
+let cachedSession: StoredSession | null = null;
+
+export function getSessionSnapshot(): StoredSession | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  const sessionKey = [
+    "civic.accessToken",
+    "civic.tokenExpiresAt",
+    "civic.userId",
+    "civic.citizenId",
+    "civic.username",
+    "civic.publicAlias",
+    "civic.roles",
+  ]
+    .map((key) => sessionStorage.getItem(key) ?? "")
+    .join("\u0000");
+
+  if (sessionKey !== cachedSessionKey) {
+    cachedSessionKey = sessionKey;
+    cachedSession = readSession();
+  }
+
+  return cachedSession;
+}
+
+export const subscribeToSession = () => () => {};
+export const getServerSessionSnapshot = () => null;
+
 export function clearSession() {
   if (typeof window === "undefined") return;
   sessionStorage.removeItem("civic.accessToken");
@@ -44,7 +75,7 @@ export function saveSession(payload: {
   accessToken: string;
   expiresAt: string;
   userId: string;
-  citizenId: string;
+  citizenId: string | null;
   username?: string | null;
   publicAlias?: string | null;
   roles?: string[];
@@ -54,7 +85,7 @@ export function saveSession(payload: {
   sessionStorage.setItem("civic.accessToken", payload.accessToken);
   sessionStorage.setItem("civic.tokenExpiresAt", String(new Date(payload.expiresAt).getTime()));
   sessionStorage.setItem("civic.userId", payload.userId);
-  sessionStorage.setItem("civic.citizenId", payload.citizenId);
+  sessionStorage.setItem("civic.citizenId", payload.citizenId ?? "");
 
   if (payload.username) sessionStorage.setItem("civic.username", payload.username);
   if (payload.publicAlias) sessionStorage.setItem("civic.publicAlias", payload.publicAlias);

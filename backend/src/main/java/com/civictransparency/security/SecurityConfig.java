@@ -39,6 +39,10 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/v1/citizens/register").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/categories/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/geography/**").permitAll()
+                        .requestMatchers("/api/v1/admin/**").hasRole("SYSTEM_ADMIN")
+                        .requestMatchers("/api/v1/authority/**")
+                        .hasAnyRole("AUTHORITY_ADMIN", "AUTHORITY_OFFICER", "SYSTEM_ADMIN")
+                        .requestMatchers("/api/v1/complaints/**").hasRole("CITIZEN")
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .anyRequest().authenticated())
                 .exceptionHandling(ex -> ex.authenticationEntryPoint((request, response, authException) -> {

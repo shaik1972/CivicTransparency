@@ -13,7 +13,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -56,8 +55,9 @@ public class TokenAuthenticationFilter extends OncePerRequestFilter {
             String token = authorization.substring("Bearer ".length()).trim();
             UUID userId = accessTokenService.verify(token);
 
-            List<SimpleGrantedAuthority> authorities = new ArrayList<>();
-            authorities.add(new SimpleGrantedAuthority("ROLE_CITIZEN"));
+            List<SimpleGrantedAuthority> authorities = accessTokenService.getAccessRoles(token).stream()
+                    .map(role -> new SimpleGrantedAuthority("ROLE_" + role))
+                    .toList();
 
             UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
                     userId,

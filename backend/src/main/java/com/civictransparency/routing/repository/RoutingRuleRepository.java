@@ -4,14 +4,16 @@ import com.civictransparency.complaint.entity.Severity;
 import com.civictransparency.routing.entity.RoutingRule;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
-import org.springframework.stereotype.Repository;
 import java.util.List;
 import java.util.UUID;
 
-@Repository
 public interface RoutingRuleRepository extends JpaRepository<RoutingRule, UUID> {
 
     @Query("SELECT r FROM RoutingRule r WHERE r.isActive = true " +
+            "AND r.department.status = 'ACTIVE' " +
+            "AND r.department.authority.status = 'ACTIVE' " +
+            "AND (r.department.authority.state IS NULL OR r.department.authority.state.stateId = :stateId) " +
+            "AND (r.department.authority.city IS NULL OR r.department.authority.city.cityId = :cityId) " +
             "AND (r.state IS NULL OR r.state.stateId = :stateId) " +
             "AND (r.city IS NULL OR r.city.cityId = :cityId) " +
             "AND (r.ward IS NULL OR r.ward.wardId = :wardId) " +

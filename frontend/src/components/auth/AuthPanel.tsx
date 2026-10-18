@@ -6,6 +6,11 @@ import { saveSession } from "@/lib/auth";
 
 type Mode = "login" | "register";
 
+type AuthPanelProps = {
+  initialMode?: Mode;
+  showRegister?: boolean;
+};
+
 type StateOption = {
   stateId: string;
   code: string;
@@ -34,7 +39,7 @@ type LoginResponse = {
   tokenType: string;
   expiresAt: string;
   userId: string;
-  citizenId: string;
+  citizenId: string | null;
   username: string | null;
   publicAlias: string | null;
   roles: string[];
@@ -42,12 +47,12 @@ type LoginResponse = {
 
 const API_BASE_URL = "http://localhost:8080";
 
-export default function AuthPanel() {
-  const [mode, setMode] = useState<Mode>("register");
+export default function AuthPanel({ initialMode = "register", showRegister = true }: AuthPanelProps) {
+  const [mode, setMode] = useState<Mode>(initialMode);
 
   return (
     <section className="flex max-h-[calc(100vh-4rem)] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
-      <div className="flex rounded-lg bg-slate-100 p-1">
+      {showRegister && <div className="flex rounded-lg bg-slate-100 p-1">
         <button
           type="button"
           onClick={() => setMode("login")}
@@ -71,9 +76,9 @@ export default function AuthPanel() {
         >
           Register
         </button>
-      </div>
+      </div>}
 
-      {mode === "register" ? (
+      {showRegister && mode === "register" ? (
         <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden pr-2">
           <RegistrationForm />
         </div>
@@ -119,7 +124,16 @@ function LoginForm() {
         roles: data.roles,
       });
 
-      router.push("/dashboard");
+      const isAuthorityUser = data.roles.some((role) =>
+        ["AUTHORITY_ADMIN", "AUTHORITY_OFFICER", "SYSTEM_ADMIN"].includes(role)
+      );
+      router.push(
+        data.roles.includes("SYSTEM_ADMIN")
+          ? "/admin"
+          : isAuthorityUser
+            ? "/authority"
+            : "/dashboard"
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to sign in.");
     } finally {
@@ -134,7 +148,7 @@ function LoginForm() {
           Welcome back
         </h2>
         <p className="mt-2 text-sm leading-6 text-slate-500">
-          Sign in to report an issue and follow its progress.
+          Sign in to access your Civic Transparency account.
         </p>
       </div>
 

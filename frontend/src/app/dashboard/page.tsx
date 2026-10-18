@@ -3,7 +3,14 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { clearSession, getAuthHeaders, readSession, type StoredSession } from "@/lib/auth";
+import {
+  clearSession,
+  getAuthHeaders,
+  getServerSessionSnapshot,
+  getSessionSnapshot,
+  readSession,
+  subscribeToSession,
+} from "@/lib/auth";
 
 type ComplaintSummary = {
   complaintId: string;
@@ -16,25 +23,45 @@ type ComplaintSummary = {
   createdAt: string;
 };
 
-const API_BASE_URL = "http://localhost:8080";
+type ComplaintStatusHistory = {
+  complaintId: string;
+  complaintReference: string;
+  currentState: string;
+  history: {
+    transitionId: string;
+    fromState: string | null;
+    toState: string;
+    reason: string;
+    createdAt: string;
+  }[];
+};
 
-function getStoredSession(): StoredSession | null {
-  return readSession();
-}
+const API_BASE_URL = "http://localhost:8080";
 
 export default function DashboardPage() {
   const router = useRouter();
   const session = useSyncExternalStore(
-    () => () => {},
-    getStoredSession,
-    () => null
+    subscribeToSession,
+    getSessionSnapshot,
+    getServerSessionSnapshot
   );
   const [complaints, setComplaints] = useState<ComplaintSummary[]>([]);
   const [complaintsLoading, setComplaintsLoading] = useState(true);
+  const [complaintsError, setComplaintsError] = useState("");
+  const [statusHistory, setStatusHistory] = useState<ComplaintStatusHistory | null>(null);
+  const [statusHistoryLoading, setStatusHistoryLoading] = useState(false);
+  const [statusHistoryError, setStatusHistoryError] = useState("");
 
   useEffect(() => {
-    if (!readSession()) {
+    const currentSession = readSession();
+    if (!currentSession) {
       router.push("/");
+    } else if (currentSession.roles.some((role) =>
+      ["AUTHORITY_ADMIN", "AUTHORITY_OFFICER", "SYSTEM_ADMIN"].includes(role)
+    )) {
+      router.replace("/authority");
+    } else if (!currentSession.citizenId) {
+      router.replace("/");
     }
   }, [router]);
 
@@ -48,9 +75,12 @@ export default function DashboardPage() {
         const response = await fetch(`${API_BASE_URL}/api/v1/complaints/mine`, {
           headers: getAuthHeaders(),
         });
-        if (response.ok) {
-          setComplaints(await response.json());
+        if (!response.ok) {
+          throw new Error("Unable to load your complaints. Please sign in again and retry.");
         }
+        setComplaints(await response.json());
+      } catch (error) {
+        setComplaintsError(error instanceof Error ? error.message : "Unable to load your complaints.");
       } finally {
         setComplaintsLoading(false);
       }
@@ -62,6 +92,32 @@ export default function DashboardPage() {
   function handleSignOut() {
     clearSession();
     router.push("/");
+  }
+
+  async function toggleStatusHistory(complaintId: string) {
+    if (statusHistory?.complaintId === complaintId) {
+      setStatusHistory(null);
+      setStatusHistoryError("");
+      return;
+    }
+
+    setStatusHistoryLoading(true);
+    setStatusHistoryError("");
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/v1/complaints/${complaintId}/status`,
+        { headers: getAuthHeaders() }
+      );
+      if (!response.ok) {
+        throw new Error("Unable to load status history. Please retry.");
+      }
+      setStatusHistory(await response.json());
+    } catch (error) {
+      setStatusHistoryError(error instanceof Error ? error.message : "Unable to load status history.");
+      setStatusHistory(null);
+    } finally {
+      setStatusHistoryLoading(false);
+    }
   }
 
   if (!session) {
@@ -177,16 +233,48 @@ export default function DashboardPage() {
             {complaintsLoading && <span className="text-xs text-slate-500">Loading...</span>}
           </div>
           <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+            {complaintsError && <p role="alert" className="p-6 text-sm text-red-700">{complaintsError}</p>}
             {complaints.length === 0 && !complaintsLoading ? (
-              <p className="p-6 text-sm text-slate-500">No complaints submitted yet.</p>
+              !complaintsError && <p className="p-6 text-sm text-slate-500">No complaints submitted yet.</p>
             ) : (
               complaints.slice(0, 5).map((complaint) => (
-                <div key={complaint.complaintId} className="flex flex-col gap-2 border-b border-slate-100 p-5 last:border-b-0 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <p className="text-sm font-semibold text-slate-900">{complaint.title}</p>
-                    <p className="mt-1 text-xs text-slate-500">{complaint.complaintReference} · {complaint.category} · {complaint.city}</p>
+                <div key={complaint.complaintId} className="border-b border-slate-100 p-5 last:border-b-0">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="text-sm font-semibold text-slate-900">{complaint.title}</p>
+                      <p className="mt-1 text-xs text-slate-500">{complaint.complaintReference} · {complaint.category} · {complaint.city}</p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="w-fit rounded-full bg-sky-100 px-3 py-1 text-xs font-semibold text-sky-800">{complaint.state}</span>
+                      <button
+                        type="button"
+                        onClick={() => void toggleStatusHistory(complaint.complaintId)}
+                        className="text-xs font-semibold text-sky-700 hover:text-sky-900"
+                      >
+                        {statusHistory?.complaintId === complaint.complaintId ? "Hide updates" : "View updates"}
+                      </button>
+                    </div>
                   </div>
-                  <span className="w-fit rounded-full bg-sky-100 px-3 py-1 text-xs font-semibold text-sky-800">{complaint.state}</span>
+                  {statusHistoryLoading && <p className="mt-3 text-xs text-slate-500">Loading status history...</p>}
+                  {statusHistoryError && <p role="alert" className="mt-3 text-xs text-red-700">{statusHistoryError}</p>}
+                  {statusHistory?.complaintId === complaint.complaintId && (
+                    <div className="mt-4 border-l-2 border-sky-200 pl-4">
+                      <p className="text-xs font-semibold text-slate-700">Current status: {statusHistory.currentState}</p>
+                      <ol className="mt-3 space-y-3">
+                        {statusHistory.history.map((entry) => (
+                          <li key={entry.transitionId} className="text-xs text-slate-600">
+                            <span className="font-semibold text-slate-800">
+                              {entry.toState.replaceAll("_", " ")}
+                            </span>
+                            {entry.reason && <span> — {entry.reason}</span>}
+                            <span className="mt-1 block text-slate-400">
+                              {new Date(entry.createdAt).toLocaleString()}
+                            </span>
+                          </li>
+                        ))}
+                      </ol>
+                    </div>
+                  )}
                 </div>
               ))
             )}

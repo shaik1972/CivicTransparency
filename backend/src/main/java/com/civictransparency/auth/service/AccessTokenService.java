@@ -14,6 +14,10 @@ public interface AccessTokenService {
 
     UUID verify(String token);
 
+    default List<String> getAccessRoles(String token) {
+        return List.of();
+    }
+
     default UUID verifyRefresh(String token) {
         return verify(token);
     }

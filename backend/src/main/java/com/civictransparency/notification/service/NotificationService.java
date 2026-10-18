@@ -8,8 +8,11 @@ import com.civictransparency.notification.entity.Notification;
 import com.civictransparency.notification.entity.NotificationDelivery;
 import com.civictransparency.notification.repository.NotificationDeliveryRepository;
 import com.civictransparency.notification.repository.NotificationRepository;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.List;
 import java.util.UUID;
@@ -20,13 +23,16 @@ public class NotificationService {
     private final NotificationRepository notificationRepository;
     private final NotificationDeliveryRepository deliveryRepository;
     private final AuthorityUserRepository authorityUserRepository;
+    private final ObjectProvider<DepartmentEmailNotifier> departmentEmailNotifier;
 
     public NotificationService(NotificationRepository notificationRepository,
                                NotificationDeliveryRepository deliveryRepository,
-                               AuthorityUserRepository authorityUserRepository) {
+                               AuthorityUserRepository authorityUserRepository,
+                               ObjectProvider<DepartmentEmailNotifier> departmentEmailNotifier) {
         this.notificationRepository = notificationRepository;
         this.deliveryRepository = deliveryRepository;
         this.authorityUserRepository = authorityUserRepository;
+        this.departmentEmailNotifier = departmentEmailNotifier;
     }
 
     @Transactional
@@ -51,7 +57,38 @@ public class NotificationService {
     }
 
     @Transactional
+    public void notifyComplaintReassigned(Complaint complaint, AuthorityDepartment department) {
+        UUID citizenUserId = complaint.getCitizen().getUser().getUserId();
+        Notification notification = new Notification(
+                UUID.randomUUID(),
+                citizenUserId,
+                "COMPLAINT_REASSIGNED",
+                "Your complaint has been reassigned",
+                "Your complaint '" + complaint.getComplaintReference() + "' is now assigned to "
+                        + department.getName() + ".");
+        notificationRepository.save(notification);
+        deliveryRepository.save(new NotificationDelivery(UUID.randomUUID(), notification, "IN_APP"));
+    }
+
+    @Transactional
     public void notifyDepartmentAssigned(Complaint complaint, AuthorityDepartment department) {
+        DepartmentEmailNotifier emailNotifier = departmentEmailNotifier.getIfAvailable();
+        if (emailNotifier != null) {
+            String complaintReference = complaint.getComplaintReference();
+            String departmentCode = department.getCode();
+            String departmentName = department.getName();
+            if (TransactionSynchronizationManager.isSynchronizationActive()) {
+                TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                    @Override
+                    public void afterCommit() {
+                        emailNotifier.notifyAssigned(complaintReference, departmentCode, departmentName);
+                    }
+                });
+            } else {
+                emailNotifier.notifyAssigned(complaintReference, departmentCode, departmentName);
+            }
+        }
+
         List<AuthorityUser> officers = authorityUserRepository.findAllByDepartment_DepartmentId(department.getDepartmentId());
 
         if (officers.isEmpty()) {

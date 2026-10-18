@@ -46,6 +46,8 @@ public class Workflow {
         this.currentState = newState;
         if (newState == ComplaintState.RESOLVED || newState == ComplaintState.REJECTED || newState == ComplaintState.CLOSED) {
             this.completedAt = OffsetDateTime.now();
+        } else {
+            this.completedAt = null;
         }
     }
 
